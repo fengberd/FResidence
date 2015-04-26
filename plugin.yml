@@ -1,0 +1,22 @@
+name: FResidence
+main: FResidence\Main
+version: 1.0.0
+api: [1.0.0]
+load: POSTWORLD
+author: FENGberd
+commands:
+ residence:
+  aliases: ["res"]
+  permission: FResidence.command.residence
+  description: "领地插件指令 - 使用 /res help 查看帮助"
+  usage: /res help
+permissions:
+ FResidence.*:
+  description: 根权限
+  default: true
+ FResidence.command.*:
+  description: 使用命令权限
+  default: true
+ FResidence.command.resistance:
+  description: 领地主指令
+  default: true
