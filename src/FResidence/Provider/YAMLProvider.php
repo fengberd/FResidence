@@ -11,14 +11,30 @@ use FResidence\Main;
 class YAMLProvider implements DataProvider
 {
 	private $config;
+	private $Residences=array();
 	
 	public function __construct(Main $main)
 	{
 		@mkdir($main->getDataFolder());
 		$this->config=new Config($main->getDataFolder()."residence.yml",Config::YAML,array(
 			"Residences"=>array()));
+		foreach($this->config->get("Residences") as $arr)
+		{
+			$this->Residences[]=new Residence($this,count($this->Residences),$arr);
+		}
 	}
 	
+	public function save()
+	{
+		$data=array();
+		foreach($this->Residences as $res)
+		{
+			$data[]=$res->data;
+			unset($res);
+		}
+		$this->config->set('Residences',$data);
+		$this->config->save();
+	}
 	public function addResidence($startpos,$endpos,$owner,$name)
 	{
 		if($owner instanceof Player)
@@ -26,19 +42,17 @@ class YAMLProvider implements DataProvider
 			$owner=$owner->getName();
 		}
 		$owner=strtolower($owner);
-		$old=$this->config->get("Residences");
-		$old[count($old).""]=array(
+		$this->Residences[]=new Residence($this,count($this->Residences),array(
 			"name"=>$name,
 			"start"=>array(
 				"x"=>(int)$startpos->getX(),
 				"y"=>(int)$startpos->getY(),
-				"z"=>(int)$startpos->getZ(),
-				"level"=>$startpos->getLevel()->getFolderName()),
+				"z"=>(int)$startpos->getZ()),
 			"end"=>array(
 				"x"=>(int)$endpos->getX(),
 				"y"=>(int)$endpos->getY(),
-				"z"=>(int)$endpos->getZ(),
-				"level"=>$endpos->getLevel()->getFolderName()),
+				"z"=>(int)$endpos->getZ()),
+			"level"=>$startpos->getLevel()->getFolderName(),
 			"owner"=>$owner,
 			"metadata"=>array(
 				"havePermissionPlayers"=>array(),
@@ -67,7 +81,7 @@ class YAMLProvider implements DataProvider
 	
 	public function getAllResidences()
 	{
-		return $this->config->get("Residences");
+		return $this->Residences;
 	}
 	
 	public function removeResidenceByPosition($pos)
@@ -88,22 +102,15 @@ class YAMLProvider implements DataProvider
 		return false;
 	}
 	
-	public function removeResidenceByID($resid)
+	public function removeResidence($resid)
 	{
-		$old=$this->config->get("Residences");
-		if(isset($old["$resid"]))
+		if(!isset($this->Residences[$resid]))
 		{
-			$ret=true;
+			return false;
 		}
-		else
-		{
-			$ret=false;
-		}
-		unset($old["$resid"]);
-		$this->config->set("Residences",$old);
-		$this->config->save();
-		unset($old,$resid);
-		return $ret;
+		unset($this->Residences[$resid],$resid);
+		$this->save();
+		return true;
 	}
 	
 	public function removeResidenceByOwner($owner)
@@ -129,31 +136,17 @@ class YAMLProvider implements DataProvider
 		return $cou;
 	}
 	
-	public function queryResidenceByPosition($pos,$lvName="")
+	public function queryResidenceByPosition($pos,$level='')
 	{
-		$x=$pos->getX();
-		$y=$pos->getY();
-		$z=$pos->getZ();
-		if($lvName=="")
+		if($pos instanceof Position)
 		{
-			$lvName=$pos->getLevel()->getFolderName();
+			$level=$pos->getLevel()->getFolderName();
 		}
-		foreach($this->getAllResidences() as $key=>$res)
+		foreach($this->Residences as $key=>$res)
 		{
-			if($res["start"]["level"]===$lvName)
+			if($res->inResidence($pos,$level))
 			{
-				$start=$res["start"];
-				$end=$res["end"];
-				if((($x<=$start["x"] && $x>=$end["x"]) || ($x>=$start["x"] && $x<=$end["x"])) && (($y<=$start["y"] && $y>=$end["y"]) || ($y>=$start["y"] && $y<=$end["y"])) && (($z<=$start["z"] && $z>=$end["z"]) || ($z>=$start["z"] && $z<=$end["z"])))
-				{
-					unset($res,$pos);
-					return $key;
-				}
-				/*if($this->in_residence($res,$pos))
-				{
-					unset($res,$pos);
-					return $key;
-				}*/
+				return $key;
 			}
 		}
 		unset($res,$pos,$key);
