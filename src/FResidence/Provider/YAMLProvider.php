@@ -29,25 +29,24 @@ class YAMLProvider implements DataProvider
 		}
 		$owner=strtolower($owner);
 		$this->Residences[]=new Residence($this,count($this->Residences),array(
-			"name"=>$name,
-			"start"=>array(
-				"x"=>(int)$startpos->getX(),
-				"y"=>(int)$startpos->getY(),
-				"z"=>(int)$startpos->getZ()),
-			"end"=>array(
-				"x"=>(int)$endpos->getX(),
-				"y"=>(int)$endpos->getY(),
-				"z"=>(int)$endpos->getZ()),
-			"level"=>$startpos->getLevel()->getFolderName(),
-			"owner"=>$owner,
-			"metadata"=>array(
-				"havePermissionPlayers"=>array(),
-				"permission"=>array(),
-				"time"=>-1,
-				"message"=>array(
-					"enter"=>"欢迎来到 %name ,这里是 %owner 的领地",
-					"leave"=>"你离开了 %name",
-					"permission"=>"[FResidence] 你没有权限使用这块领地")));
+			'name'=>$name,
+			'start'=>array(
+				'x'=>(int)$startpos->getX(),
+				'y'=>(int)$startpos->getY(),
+				'z'=>(int)$startpos->getZ()),
+			'end'=>array(
+				'x'=>(int)$endpos->getX(),
+				'y'=>(int)$endpos->getY(),
+				'z'=>(int)$endpos->getZ()),
+			'level'=>$startpos->getLevel()->getFolderName(),
+			'owner'=>$owner,
+			'metadata'=>array(
+				'permission'=>array(
+					'move'=>true),
+				'message'=>array(
+					'enter'=>'欢迎来到 %name ,这里是 %owner 的领地',
+					'leave'=>'你离开了 %name',
+					'permission'=>'你没有权限使用这块领地'))));
 		$this->save();
 		unset($startpos,$endpos,$owner,$name);
 		return count($this->Residences)-1;
@@ -159,7 +158,7 @@ class YAMLProvider implements DataProvider
 		$data=array();
 		foreach($this->Residences as $res)
 		{
-			$data[]=$res->data;
+			$data[]=$res->getData();
 			unset($res);
 		}
 		$this->config->set('Residences',$data);
@@ -183,61 +182,14 @@ class YAMLProvider implements DataProvider
 		}
 		unset($save);
 		@mkdir($this->main->getDataFolder());
-		$this->config=new Config($this->main->getDataFolder()."residence.yml",Config::YAML,array(
-			"dataVersion"=>1,
-			"Residences"=>array()));
-		foreach($this->config->get("Residences") as $arr)
+		$this->config=new Config($this->main->getDataFolder().'residence.yml',Config::YAML,array(
+			'dataVersion'=>1,
+			'Residences'=>array()));
+		foreach($this->config->get('Residences') as $arr)
 		{
 			$this->Residences[]=new Residence($this,count($this->Residences),$arr);
 			unset($arr);
 		}
-	}
-	
-	public function getResidenceVector3Array($pos1,$pos2)
-	{
-		if($pos1 instanceof Vector3)
-		{
-			$x1=$pos1->getX();
-			$y1=$pos1->getY();
-			$z1=$pos1->getZ();
-		}
-		else
-		{
-			$x1=$pos1["x"];
-			$y1=$pos1["y"];
-			$z1=$pos1["z"];
-		}
-		if($pos2 instanceof Vector3)
-		{
-			$x2=$pos2->getX();
-			$y2=$pos2->getY();
-			$z2=$pos2->getZ();
-		}
-		else
-		{
-			$x2=$pos2["x"];
-			$y2=$pos2["y"];
-			$z2=$pos2["z"];
-		}
-		$return=array();
-		$lowestX=min($x1,$x2);
-		$lowestY=min($y1,$y2);
-		$lowestZ=min($z1,$z2);
-		$highestX=max($x1,$x2);
-		$highestY=max($y1,$y2);
-		$highestZ=max($z1,$z2);
-		for($x=$lowestX;$x<=$highestX;$x++)
-		{
-			for($y=$lowestY;$y<=$highestY;$y++)
-			{
-				for($z=$lowestZ;$z<=$highestZ;$z++)
-				{
-					$return[]=new Vector3($x,$y,$z);
-				}
-			}
-		}
-		unset($pos1,$pos2,$x1,$x2,$y1,$y2,$z1,$z2,$x,$y,$z,$lowestX,$lowestY,$lowestZ,$highestX,$highestY,$highestZ);
-		return $return;
 	}
 }
 ?>

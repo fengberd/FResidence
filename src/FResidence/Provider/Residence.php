@@ -25,6 +25,11 @@ class Residence
 		$this->provider->save();
 	}
 	
+	public function getData()
+	{
+		return $this->data;
+	}
+	
 	public function getStart()
 	{
 		return $this->data['start'];
@@ -68,7 +73,7 @@ class Residence
 	
 	public function getMessage($index,$default='数据读取失败')
 	{
-		return isset($this->data['metadata']['message'][$index])?$this->data['metadata']['message'][$index]:$default;
+		return isset($this->data['metadata']['message'][$index])?"§e".$this->data['metadata']['message'][$index]:$default;
 	}
 	
 	public function setMessage($index,$message)
@@ -99,6 +104,33 @@ class Residence
 			return true;
 		}
 		unset($x,$y,$z,$start,$end,$pos,$level);
+		return false;
+	}
+	
+	public function trycheck($pos1,$pos2)
+	{
+		$stx=$this->getStart()["x"];
+		$sty=$this->getStart()["y"];
+		$stz=$this->getStart()["z"];
+		
+		$edx=$this->getEnd()["x"];
+		$edy=$this->getEnd()["y"];
+		$edz=$this->getEnd()["z"];
+		
+		$s1x=$pos1->getX();
+		$s1y=$pos1->getY();
+		$s1z=$pos1->getZ();
+		
+		$s2x=$pos2->getX();
+		$s2y=$pos2->getY();
+		$s2z=$pos2->getZ();
+		
+		if((($stx<$s1x && $edx>$s1x) || ($edx<$s2x && $edx>$s2x)) &&
+			(($sty<$s1y && $edy>$s1y) || ($edy<$s2y && $edy>$s2y)) &&
+			(($stz<$s1z && $edz > $s1z) || ($edz<$s2z && $edz>$s2z)))
+		{
+				return true;
+		}
 		return false;
 	}
 }
