@@ -42,7 +42,9 @@ class YAMLProvider implements DataProvider
 			'owner'=>$owner,
 			'metadata'=>array(
 				'permission'=>array(
-					'move'=>true),
+					'move'=>'true',
+					'build'=>'false',
+					'use'=>'false'),
 				'message'=>array(
 					'enter'=>'欢迎来到 %name ,这里是 %owner 的领地',
 					'leave'=>'你离开了 %name',

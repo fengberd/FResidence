@@ -82,6 +82,17 @@ class Residence
 		$this->save();
 	}
 	
+	public function getPermission($index,$default=false)
+	{
+		return isset($this->data['metadata']['permission'][$index])?($this->data['metadata']['permission'][$index]=='true'):$default;
+	}
+	
+	public function setPermission($index,$permission)
+	{
+		$this->data['metadata']['permission'][$index]=$permission;
+		$this->save();
+	}
+	
 	public function inResidence(Vector3 $pos,$level='')
 	{
 		if($level instanceof Level)

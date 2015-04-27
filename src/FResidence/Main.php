@@ -10,6 +10,7 @@ use pocketmine\command\ConsoleCommandSender;
 use pocketmine\Player;
 use pocketmine\Server;
 use pocketmine\item\Item;
+use pocketmine\block\Block;
 use pocketmine\level\Level;
 use pocketmine\math\Vector3;
 use pocketmine\utils\Config;
@@ -129,8 +130,8 @@ class Main extends PluginBase implements Listener
 				if($this->provider->queryResidenceByPosition($v3,$level)!==false)
 				{
 					$break=true;
-					$sender->sendMessage('[FResidence] 不能覆盖别人的领地 ,检测到覆盖坐标 :');
-					$sender->sendMessage('[FResidence] X:'.$v3->getX().',Y:'.$v3->getY().',Z:'.$v3->getZ());
+					$sender->sendMessage(TextFormat::RED.'[FResidence] 不能覆盖别人的领地 ,检测到覆盖坐标 :');
+					$sender->sendMessage(TextFormat::RED.'[FResidence] X:'.$v3->getX().',Y:'.$v3->getY().',Z:'.$v3->getZ());
 					break;
 				}
 				unset($v3);
@@ -143,54 +144,86 @@ class Main extends PluginBase implements Listener
 			IncludeAPI::Economy_setMoney($sender,IncludeAPI::Economy_getMoney($sender)-$money);
 			$this->select[$sender->getName()]->setP1(false);
 			$this->select[$sender->getName()]->setP2(false);
-			$sender->sendMessage('[FResidence] 领地创建成功 ,花费 '.$money.' '.$this->moneyName);
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 领地创建成功 ,花费 '.$money.' '.$this->moneyName);
 			break;
 		case 'remove':
 			if(!isset($args[1]))
 			{
-				$sender->sendMessage('[FResidence] 请使用 /res help 查看帮助');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
 				break;
 			}
 			$rid=$this->provider->queryResidenceByName($args[1]);
 			$res=$this->provider->getResidence($rid);
 			if($rid===false || $res===false)
 			{
-				$sender->sendMessage('[FResidence] 不存在这块领地');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 不存在这块领地');
 				break;
 			}
 			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()))
 			{
-				$sender->sendMessage('[FResidence] 你没有权限移除这块领地');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限移除这块领地');
 				break;
 			}
 			$this->provider->removeResidence($rid);
-			$sender->sendMessage('[FResidence] 领地移除成功');
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 领地移除成功');
 			break;
 		case 'message':
 			if(!isset($args[2]))
 			{
-				$sender->sendMessage('[FResidence] 请使用 /res help 查看帮助');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
 				break;
 			}
 			$args[2]=strtolower($args[2]);
 			if($args[2]!='enter' && $args[2]!='leave' && $args[2]!='permission')
 			{
-				$sender->sendMessage('[FResidence] 错误的消息索引 ,只能为以下值的任意一个 :\nenter - 进入消息\nleave - 离开消息\npermission - 没有权限消息');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的消息索引 ,只能为以下值的任意一个 :/nenter - 进入消息/nleave - 离开消息/npermission - 没有权限消息');
 				break;
 			}
-			$rid=$this->provider->queryResidenceByName($args[1]);
-			if($rid===false)
+			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
+			if($res===false)
 			{
-				$sender->sendMessage('[FResidence] 不存在这块领地');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 不存在这块领地');
 				break;
 			}
 			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()))
 			{
-				$sender->sendMessage('[FResidence] 你没有权限修改这块领地的消息');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限修改这块领地的消息');
 				break;
 			}
-			$this->provider->setResidenceMessage($rid,$args[2],$args[3]);
-			$sender->sendMessage('[FResidence] 领地消息设置成功');
+			$res->setMessage($args[2],$args[3]);
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 领地消息设置成功');
+			break;
+		case 'permission':
+			if(!isset($args[3]))
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				break;
+			}
+			$args[2]=strtolower($args[2]);
+			if($args[2]!='move' && $args[2]!='build' && $args[2]!='use')
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限索引 ,只能为以下值的任意一个 :\nmove - 玩家移动权限\nbuild - 破坏/放置权限\nuse - 使用工作台/箱子等权限\n');
+				break;
+			}
+			$args[3]=strtolower($args[3]);
+			if($args[3]!='true' && $args[3]!="false")
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限值 ,只能为以下值的任意一个 :\n'.TextFormat::RED.'true - 开放此权限\n'.TextFormat::RED.'false - 只有你自己能使用这个权限');
+				break;
+			}
+			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
+			if($res===false)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 不存在这块领地');
+				break;
+			}
+			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()))
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限修改这块领地的权限');
+				break;
+			}
+			$res->setPermission($args[2],$args[3]);
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 领地权限设置成功');
 			break;
 		case 'help':
 		case '？':
@@ -203,7 +236,7 @@ class Main extends PluginBase implements Listener
 			$sender->sendMessage($help);
 			break;
 		default:
-			$sender->sendMessage('[FResidence] 使用 /res help 查看帮助');
+			$sender->sendMessage(TextFormat::RED.'[FResidence] 使用 /res help 查看帮助');
 			break;
 		}
 		unset($sender,$command,$label,$help,$rid,$res,$resarr,$break,$select1,$select2,$level,$args);
@@ -212,17 +245,20 @@ class Main extends PluginBase implements Listener
 	
 	public function onPlayerInteract(PlayerInteractEvent $event)
 	{
-		if($event->getBlock()->getX()!==0 && $event->getBlock()->getY()!==0 && $event->getBlock()->getZ()!==0 && ($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==$event->getPlayer()->getName())
+		if($event->getAction()==PlayerInteractEvent::RIGHT_CLICK_BLOCK)
 		{
-			$msg=$res->getMessage('permission');
-			$event->getPlayer()->sendMessage($msg);
-			$event->setCancelled();
-		}
-		else if($event->getBlock()->getX()!==0 && $event->getBlock()->getY()!==0 && $event->getBlock()->getZ()!==0 && $event->getItem()->getId()==$this->landItem)
-		{
-			$this->select[$event->getPlayer()->getName()]->setP1($event->getBlock());
-			$event->getPlayer()->sendMessage('[FResidence] 已设置第一个点');
-			$event->setCancelled();
+			if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$event->getPlayer()->isOp() && ($this->isProtectBlock($event->getBlock()) || $this->isBlockedItem($event->getItem())) && !$res->getPermission('use'))
+			{
+				$msg=$res->getMessage('permission');
+				$event->getPlayer()->sendMessage($msg);
+				$event->setCancelled();
+			}
+			else if($event->getItem()->getId()==$this->landItem)
+			{
+				$this->select[$event->getPlayer()->getName()]->setP1($event->getBlock());
+				$event->getPlayer()->sendMessage('[FResidence] 已设置第一个点');
+				$event->setCancelled();
+			}
 		}
 		unset($event,$res,$msg);
 	}
@@ -241,31 +277,38 @@ class Main extends PluginBase implements Listener
 	
 	public function onPlayerMove(PlayerMoveEvent $event)
 	{
-		$rid=$this->provider->queryResidenceByPosition($event->getTo());
-		$res=$this->provider->getResidence($rid);
-		if(($rid===false || $res===false) && $this->select[$event->getPlayer()->getName()]->nowland!==false)
+		$res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getTo()));
+		if($res!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$event->getPlayer()->isOp() && !$res->getPermission('move'))
 		{
-			$res=$this->provider->getResidence($this->select[$event->getPlayer()->getName()]->nowland);
-			$this->select[$event->getPlayer()->getName()]->nowland=false;
-			$msg=$res->getMessage('leave');
-			$msg=str_replace('%name',$res->getName(),$msg);
-			$msg=str_replace('%owner',$res->getOwner(),$msg);
-			$event->getPlayer()->sendMessage($msg);
+			$event->setCancelled();
+			$event->getPlayer()->sendPopup($res->getMessage('permission'));
 		}
-		else if($res!==false && $this->select[$event->getPlayer()->getName()]->nowland!==$rid)
+		else if($res===false && $this->select[$event->getPlayer()->getName()]->nowland!==false)
 		{
-			$this->select[$event->getPlayer()->getName()]->nowland=$rid;
+			$res=$this->provider->getResidence($this->provider->queryResidenceByName($this->select[$event->getPlayer()->getName()]->nowland));
+			if($res!==false)
+			{
+				$this->select[$event->getPlayer()->getName()]->nowland=false;
+				$msg=$res->getMessage('leave');
+				$msg=str_replace('%name',$res->getName(),$msg);
+				$msg=str_replace('%owner',$res->getOwner(),$msg);
+				$event->getPlayer()->sendMessage($msg);
+			}
+		}
+		else if($res!==false && $this->select[$event->getPlayer()->getName()]->nowland!==$res->getName())
+		{
+			$this->select[$event->getPlayer()->getName()]->nowland=$res->getName();
 			$msg=$res->getMessage('enter');
 			$msg=str_replace('%name',$res->getName(),$msg);
 			$msg=str_replace('%owner',$res->getOwner(),$msg);
 			$event->getPlayer()->sendMessage($msg);
 		}
-		unset($event,$res,$msg,$rid);
+		unset($event,$res,$msg);
 	}
 	
 	public function onBlockPlace(BlockPlaceEvent $event)
 	{
-		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==$event->getPlayer()->getName())
+		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$res->getPermission('build') && !$event->getPlayer()->isOp())
 		{
 			$msg=$res->getMessage('permission');
 			$event->getPlayer()->sendMessage($msg);
@@ -276,7 +319,7 @@ class Main extends PluginBase implements Listener
 	
 	public function onBlockBreak(BlockBreakEvent $event)
 	{
-		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==$event->getPlayer()->getName())
+		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$res->getPermission('build') && !$event->getPlayer()->isOp())
 		{
 			$msg=$res->getMessage('permission');
 			$event->getPlayer()->sendMessage($msg);
@@ -394,6 +437,79 @@ class Main extends PluginBase implements Listener
 		}
 		unset($pos1,$pos2,$x1,$x2,$y1,$y2,$z1,$z2,$x,$y,$z,$n1,$n2,$n3);
 		return $return;
+	}
+	
+	public function isProtectBlock(Block $block)
+	{
+		switch($block->getId())
+		{
+		//case Item::GRASS:
+		//case Item::DIRT:
+		case Item::BED_BLOCK:
+		//case Item::TNT:
+		//case Item::FIRE:
+		//case Item::MONSTER_SPAWNER:
+		case Item::CHEST:
+		case Item::CRAFTING_TABLE:
+		case Item::DOOR_BLOCK:
+		//case 27:
+		//case 66:
+		case Item::IRON_DOOR_BLOCK:
+		case Item::TRAPDOOR:
+		//case Item::PUMPKIN_STEM:
+		//case Item::MELON_STEM:
+		case Item::FENCE_GATE:
+		//case Item::END_PORTAL:
+		case 126:
+		/*case Item::CARROT_BLOCK:
+		case Item::POTATO_BLOCK:
+		case Item::PODZOL:
+		case Item::BEETROOT_BLOCK:*/
+		case Item::STONECUTTER:
+		case Item::NETHER_REACTOR:
+		/*case Item:::
+		case Item:::
+		case Item:::*/
+			unset($block);
+			return true;
+		}
+		unset($block);
+		return false;
+	}
+	
+	public function isBlockedItem(Item $item)
+	{
+		switch($item->getId())
+		{
+		case Item::FLINT_STEEL:
+		case Item::BOW:
+		case Item::SEEDS:
+		case Item::BUCKET:
+		case Item::MINECART:
+		case Item::REDSTONE:
+		case Item::DYE:
+		case Item::PUMPKIN_SEEDS:
+		case Item::MELON_SEEDS:
+		case Item::CARROT:
+		case Item::POTATO:
+		case Item::BEETROOT_SEEDS:
+		/*case Item:::
+		case Item:::
+		case Item:::
+		case Item:::
+		case Item:::
+		case Item:::
+		case Item:::
+		case Item:::
+		case Item:::
+		case Item:::
+		case Item:::
+		case Item:::*/
+			unset($item);
+			return true;
+		}
+		unset($item);
+		return false;
 	}
 }
 
