@@ -12,29 +12,15 @@ class YAMLProvider implements DataProvider
 {
 	private $config;
 	private $Residences=array();
+	private $main;
 	
 	public function __construct(Main $main)
 	{
-		@mkdir($main->getDataFolder());
-		$this->config=new Config($main->getDataFolder()."residence.yml",Config::YAML,array(
-			"Residences"=>array()));
-		foreach($this->config->get("Residences") as $arr)
-		{
-			$this->Residences[]=new Residence($this,count($this->Residences),$arr);
-		}
+		$this->main=$main;
+		$this->reload();
+		unset($main);
 	}
 	
-	public function save()
-	{
-		$data=array();
-		foreach($this->Residences as $res)
-		{
-			$data[]=$res->data;
-			unset($res);
-		}
-		$this->config->set('Residences',$data);
-		$this->config->save();
-	}
 	public function addResidence($startpos,$endpos,$owner,$name)
 	{
 		if($owner instanceof Player)
@@ -62,21 +48,9 @@ class YAMLProvider implements DataProvider
 					"enter"=>"欢迎来到 %name ,这里是 %owner 的领地",
 					"leave"=>"你离开了 %name",
 					"permission"=>"[FResidence] 你没有权限使用这块领地")));
-		$this->config->set("Residences",$old);
-		$this->config->save();
-	}
-	
-	public function getResidenceMessage($res,$msgid,$default="获取数据错误")
-	{
-		return "§e".isset($res["metadata"]["message"][$msgid])?$res["metadata"]["message"][$msgid]:$default;
-	}
-	
-	public function setResidenceMessage($resid,$msgid,$message)
-	{
-		$old=$this->config->get("Residences");
-		$old[$resid]["metadata"]["message"][$msgid]=$message;
-		$this->config->set("Residences",$old);
-		$this->config->save();
+		$this->save();
+		unset($startpos,$endpos,$owner,$name);
+		return count($this->Residences)-1;
 	}
 	
 	public function getAllResidences()
@@ -84,22 +58,9 @@ class YAMLProvider implements DataProvider
 		return $this->Residences;
 	}
 	
-	public function removeResidenceByPosition($pos)
+	public function getResidence($resid)
 	{
-		$old=$this->config->get("Residences");
-		foreach($old as $key=>$res)
-		{
-			if($res["start"]["level"]===$pos->getLevel()->getFolderName() && $this->in_residence($res,$pos))
-			{
-				unset($old[$key]);
-				$this->config->set("Residences",$old);
-				$this->config->save();
-				unset($res,$pos,$old);
-				return true;
-			}
-		}
-		unset($res,$pos,$key,$old);
-		return false;
+		return isset($this->Residences[$resid])?$this->Residences[$resid]:false;
 	}
 	
 	public function removeResidence($resid)
@@ -113,7 +74,7 @@ class YAMLProvider implements DataProvider
 		return true;
 	}
 	
-	public function removeResidenceByOwner($owner)
+	public function removeResidencesByOwner($owner)
 	{
 		if($owner instanceof Player)
 		{
@@ -121,19 +82,53 @@ class YAMLProvider implements DataProvider
 		}
 		$owner=strtolower($owner);
 		$cou=0;
-		$old=$this->config->get("Residences");
-		foreach($this->getAllResidences() as $key=>$res)
+		foreach($this->Residences as $key=>$res)
 		{
-			if($res["owner"]===$owner)
+			if($res->getOwner()===$owner)
 			{
-				unset($old[$key]);
+				unset($this->Residences[$key]);
 				$cou++;
 			}
+			unset($key,$res);
 		}
-		$this->config->set("Residences",$old);
-		$this->config->save();
-		unset($res,$pos,$key,$old);
+		$this->save();
+		unset($res,$pos,$key);
 		return $cou;
+	}
+	
+	public function queryResidenceByName($name)
+	{
+		foreach($this->Residences as $key=>$res)
+		{
+			if($res->getName()===$name)
+			{
+				unset($res,$pos,$name);
+				return $key;
+			}
+			unset($key,$res);
+		}
+		unset($name);
+		return false;
+	}
+	
+	public function queryResidencesByOwner($owner)
+	{
+		if($owner instanceof Player)
+		{
+			$owner=$owner->getName();
+		}
+		$owner=strtolower($owner);
+		$ret=array();
+		foreach($this->Residences as $key=>$res)
+		{
+			if($res->getOwner()===$owner)
+			{
+				$ret[$key]=$res;
+			}
+			unset($key,$res);
+		}
+		unset($owner);
+		return $ret;
 	}
 	
 	public function queryResidenceByPosition($pos,$level='')
@@ -146,53 +141,12 @@ class YAMLProvider implements DataProvider
 		{
 			if($res->inResidence($pos,$level))
 			{
+				unset($pos,$level,$res);
 				return $key;
 			}
 		}
-		unset($res,$pos,$key);
+		unset($pos,$level,$key,$res);
 		return false;
-	}
-	
-	public function getResidenceByID($ID)
-	{
-		if($ID===false)
-		{
-			return false;
-		}
-		return isset($this->getAllResidences()[$ID])?$this->getAllResidences()[$ID]:false;
-	}
-	
-	public function queryResidenceByName($name)
-	{
-		foreach($this->getAllResidences() as $key=>$res)
-		{
-			if($res["name"]===$name)
-			{
-				unset($res,$pos,$name);
-				return $key;
-			}
-		}
-		unset($res,$key,$name);
-		return false;
-	}
-	
-	public function queryResidencesByOwner($owner)
-	{
-		if($owner instanceof Player)
-		{
-			$owner=$owner->getName();
-		}
-		$owner=strtolower($owner);
-		$ret=array();
-		foreach($this->getAllResidences() as $key=>$res)
-		{
-			if($res["owner"]===$owner)
-			{
-				$ret["$key"]=$res;
-			}
-		}
-		unset($res,$pos,$key);
-		return $ret;
 	}
 	
 	public function getConfig()
@@ -200,29 +154,43 @@ class YAMLProvider implements DataProvider
 		return $this->config;
 	}
 	
-	public function reload()
+	public function save()
 	{
-		@mkdir($main->getDataFolder());
-		$this->config=new Config($main->getDataFolder()."residence.yml",Config::YAML);
-	}
-	
-	public function close()
-	{
-		unset($this);
-	}
-	
-	public function in_residence($res,$pos)
-	{
-		foreach($this->getResidenceVector3Array($res["start"],$res["end"]) as $vec)
+		$data=array();
+		foreach($this->Residences as $res)
 		{
-			if($vec->equals($pos))
-			{
-				unset($res,$pos,$vec);
-				return true;
-			}
+			$data[]=$res->data;
+			unset($res);
 		}
-		unset($res,$pos,$vec);
-		return false;
+		$this->config->set('Residences',$data);
+		$this->config->save();
+	}
+	
+	public function close($save=true)
+	{
+		if($save)
+		{
+			$this->save();
+		}
+		unset($save,$this);
+	}
+	
+	public function reload($save=false)
+	{
+		if($save)
+		{
+			$this->save();
+		}
+		unset($save);
+		@mkdir($this->main->getDataFolder());
+		$this->config=new Config($this->main->getDataFolder()."residence.yml",Config::YAML,array(
+			"dataVersion"=>1,
+			"Residences"=>array()));
+		foreach($this->config->get("Residences") as $arr)
+		{
+			$this->Residences[]=new Residence($this,count($this->Residences),$arr);
+			unset($arr);
+		}
 	}
 	
 	public function getResidenceVector3Array($pos1,$pos2)
