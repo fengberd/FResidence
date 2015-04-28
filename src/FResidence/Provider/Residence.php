@@ -40,6 +40,13 @@ class Residence
 		return $this->data['end'];
 	}
 	
+	public function getSize()
+	{
+		$select1=$this->data['start'];
+		$select2=$this->data['end'];
+		return abs($select1['x']-$select2['x'])*abs($select1['y']-$select2['y'])*abs($select1['z']-$select2['z']);
+	}
+	
 	public function getLevel()
 	{
 		return $this->data['level'];
