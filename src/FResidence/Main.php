@@ -167,6 +167,21 @@ class Main extends PluginBase implements Listener
 			$this->provider->removeResidence($rid);
 			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 领地移除成功');
 			break;
+		case 'removeall':
+			if(!$sender instanceof Player)
+			{
+				if(!isset($args[1]))
+				{
+					$sender->sendMessage(TextFormat::RED.'[FResidence] 请在游戏中执行这个指令或指定要移除的玩家');
+				}
+				else
+				{
+					$sender->sendMessage(TextFormat::GREEN.'[FResidence] 成功移除玩家 '.$args[1].' 的所有领地 (操作 '.$this->provider->removeResidencesByOwner($args[1]).' 块领地)');
+				}
+				break;
+			}
+			$sender->sendMessage('[FResidence] 成功移除你的所有领地 (操作 '.$this->provider->removeResidencesByOwner($sender->getName()).' 块领地)');
+			break;
 		case 'message':
 			if(!isset($args[2]))
 			{
@@ -200,9 +215,9 @@ class Main extends PluginBase implements Listener
 				break;
 			}
 			$args[2]=strtolower($args[2]);
-			if($args[2]!='move' && $args[2]!='build' && $args[2]!='use')
+			if($args[2]!='move' && $args[2]!='build' && $args[2]!='use' && $args[2]!='attack')
 			{
-				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限索引 ,只能为以下值的任意一个 :\nmove - 玩家移动权限\nbuild - 破坏/放置权限\nuse - 使用工作台/箱子等权限\n');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限索引 ,只能为以下值的任意一个 :\nmove - 玩家移动权限\nbuild - 破坏/放置权限\nuse - 使用工作台/箱子等权限\nattack - 攻击权限');
 				break;
 			}
 			$args[3]=strtolower($args[3]);
@@ -231,7 +246,9 @@ class Main extends PluginBase implements Listener
 			$help='=====FResidence commands=====\n';
 			$help.='/res create <名称> - 创建一个领地\n';
 			$help.='/res remove <名称> - 移除指定名称的领地\n';
-			$help.='/res message <领地> <索引> <内容> - 设置领地的消息内容\n     - 注 :索引可为enter/leave/permission\n';
+			$http.=TextFormat::RED.'/res removeall '.($sender instanceof Player?'':'<玩家ID>').'- 移除'.($sender instanceof Player?'你':'某玩家').'的所有领地\n';
+			$help.='/res message <领地> <索引> <内容> - 设置领地的消息内容\n';
+			$help.='/res permission <领地> <索引> <true/false> - 设置领地权限\n';
 			$help.='/res help - 查看帮助\n';
 			$sender->sendMessage($help);
 			break;
