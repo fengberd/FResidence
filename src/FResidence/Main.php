@@ -89,6 +89,12 @@ class Main extends PluginBase implements Listener
 	
 	public function onCommand(CommandSender $sender, Command $command, $label, array $args)
 	{
+		if(!isset($args[0]))
+		{
+			$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+			unset($sender,$command,$label,$args);
+			return;
+		}
 		switch($args[0])
 		{
 		case 'create':
@@ -311,18 +317,19 @@ class Main extends PluginBase implements Listener
 				break;
 			}
 			$args[2]=strtolower($args[2]);
-			if($args[2]!='move' && $args[2]!='build' && $args[2]!='use' && $args[2]!='pvp' && $args[2]!='damage')
+			if($args[2]!='move' && $args[2]!='build' && $args[2]!='use' && $args[2]!='pvp' && $args[2]!='damage' && $args[2]!='tp')
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限索引 ,只能为以下值的任意一个 :'.self::$NL.
 					'move - 玩家移动权限'.self::$NL.
 					'build - 破坏/放置权限'.self::$NL.
 					'use - 使用工作台/箱子等权限'.self::$NL.
 					'pvp - PVP权限'.self::$NL.
-					'damage - 是否能受到伤害');
+					'damage - 是否能受到伤害'.self::$NL.
+					'tp - 传送到此领地的权限');
 				break;
 			}
 			$args[3]=strtolower($args[3]);
-			if($args[3]!='true' && $args[3]!="false")
+			if($args[3]!='true' && $args[3]!='false')
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限值 ,只能为以下值的任意一个 :'.self::$NL.TextFormat::RED.'true - 开放此权限'.self::$NL.TextFormat::RED.'false - 只有你自己能使用这个权限');
 				break;
@@ -354,14 +361,14 @@ class Main extends PluginBase implements Listener
 				break;
 			}
 			$args[3]=strtolower($args[3]);
-			if($args[3]!='move' && $args[3]!='build' && $args[3]!='use' && $args[3]!='pvp' && $args[3]!='admin')
+			if($args[3]!='move' && $args[3]!='build' && $args[3]!='use' && $args[3]!='pvp' && $args[3]!='tp')
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限索引 ,只能为以下值的任意一个 :'.self::$NL.
 					'move - 玩家移动权限'.self::$NL.
 					'build - 破坏/放置权限'.self::$NL.
 					'use - 使用工作台/箱子等权限'.self::$NL.
 					'pvp - PVP权限'.self::$NL.
-					'admin - 完全的管理权限');
+					'tp - 传送到此领地的权限');
 				break;
 			}
 			$args[4]=strtolower($args[4]);
@@ -384,17 +391,80 @@ class Main extends PluginBase implements Listener
 			$res->setPlayerPermission($args[2],$args[3],$args[4]);
 			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 成功设置玩家 '.$args[2].' 的领地权限 '.$args[3]);
 			break;
+		case 'tp':
+			if(!isset($args[1]))
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				break;
+			}
+			if(!$sender instanceof Player)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 请在游戏中执行这个指令');
+				break;
+			}
+			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
+			if($res===false)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 不存在这块领地');
+				break;
+			}
+			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()) && !$this->provider->getPlayerPermission($sender->getName(),'tp'))
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限传送到这块领地');
+				break;
+			}
+			$sender->teleport($res->getTeleportPos());
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 传送到领地 '.$args[1]);
+			break;
+		case 'tpset':
+			if(!$sender instanceof Player)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 请在游戏中执行这个指令');
+				break;
+			}
+			$res=$this->provider->getResidence($this->provider->queryResidenceByPosition($sender));
+			if($res===false)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 这个位置没有领地');
+				break;
+			}
+			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()))
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限修改该领地的传送点');
+				break;
+			}
+			$res->setTeleportPos($sender);
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 领地 '.$res->getName().' 的传送点修改成功');
+			break;
 		case 'help':
 		case '？':
 		case '?':
-			$help='=====FResidence commands====='.self::$NL;
-			$help.='/res create <名称> - 创建一个领地'.self::$NL;
-			$help.='/res remove <名称> - 移除指定名称的领地'.self::$NL;
-			$help.=TextFormat::RED.'/res removeall '.($sender instanceof Player?'':'<玩家ID> ').'- 移除'.($sender instanceof Player?'你':'某玩家').'的所有领地'.self::$NL;
-			$help.='/res message <领地> <索引> <内容> - 设置领地的消息内容'.self::$NL;
-			$help.='/res set <领地> <权限> <true/false> - 设置领地权限'.self::$NL;
+			if(isset($args[1]))
+			{
+				$page=(int)$args[1];
+			}
+			else
+			{
+				$page=1;
+			}
+			switch($page)
+			{
+			default:
+				$page=1;
+			case 1:
+				$help.='/res create <名称> - 创建一个领地'.self::$NL;
+				$help.='/res remove <名称> - 移除指定名称的领地'.self::$NL;
+				$help.=TextFormat::RED.'/res removeall '.($sender instanceof Player?'':'<玩家ID> ').'- 移除'.($sender instanceof Player?'你':'某玩家').'的所有领地'.self::$NL;
+				$help.='/res message <领地> <索引> <内容> - 设置领地的消息内容'.self::$NL;
+				$help.='/res set <领地> <权限> <true/false> - 设置领地权限'.self::$NL;
+				break;
+			case 2:
 			$help.='/res pset <领地> <玩家> <权限> <true/false> - 设置某玩家的领地权限'.self::$NL;
+			$help.='/res tp <领地> - 传送到某领地'.self::$NL;
+			$help.='/res tpset - 设置当前坐标为当前领地传送点'.self::$NL;
 			$help.='/res help - 查看帮助'.self::$NL;
+			}
+			$help='=====FResidence commands ['.$page.'/2]====='.self::$NL.$help;
 			$sender->sendMessage($help);
 			break;
 		default:
@@ -708,3 +778,4 @@ class PlayerInfo
 		unset($pos);
 	}
 }
+?>

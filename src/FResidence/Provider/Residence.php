@@ -4,8 +4,10 @@ namespace FResidence\Provider;
 use FResidence\Main;
 
 use pocketmine\Player;
-use pocketmine\math\Vector3;
+use pocketmine\Server;
 use pocketmine\level\Level;
+use pocketmine\math\Vector3;
+use pocketmine\level\Position;
 
 class Residence
 {
@@ -14,12 +16,13 @@ class Residence
 		'build'=>'false',
 		'use'=>'false',
 		'pvp'=>'true',
-		'damage'=>'true');
+		'damage'=>'true',
+		'tp'=>'false');
 	private $provider;
 	private $__rid=-1;
 	private $data;
 	
-	public function __construct(DataProvider $provider,$ID,array $data)//int $ID,array $start,array $end,$name,$owner,$metadata)
+	public function __construct(DataProvider $provider,$ID,array $data)
 	{
 		$this->__rid=$ID;
 		$this->provider=$provider;
@@ -71,6 +74,7 @@ class Residence
 		}
 		$this->data['owner']=$owner;
 		$this->save();
+		unset($owner);
 	}
 	
 	public function getName()
@@ -82,17 +86,19 @@ class Residence
 	{
 		$this->data['name']=$name;
 		$this->save();
+		unset($name);
 	}
 	
 	public function getMessage($index,$default='数据读取失败')
 	{
-		return isset($this->data['metadata']['message'][$index])?"§e".$this->data['metadata']['message'][$index]:$default;
+		return isset($this->data['metadata']['message'][$index])?'§e'.$this->data['metadata']['message'][$index]:$default;
 	}
 	
 	public function setMessage($index,$message)
 	{
 		$this->data['metadata']['message'][$index]=$message;
 		$this->save();
+		unset($index,$message);
 	}
 	
 	public function resetPermission()
@@ -111,6 +117,7 @@ class Residence
 	{
 		$this->data['metadata']['permission'][$index]=$permission;
 		$this->save();
+		unset($index,$permission);
 	}
 	
 	public function setPlayerPermission($player,$index,$permission)
@@ -122,11 +129,14 @@ class Residence
 		$player=strtolower($player);
 		if($permission=='remove')
 		{
-			return $this->removePlayerPermission($player,$index);
+			$this->removePlayerPermission($player,$index);
 		}
-		$this->data['metadata']['playerpermission'][$player][$index]=$permission;
-		$this->save();
-		return true;
+		else
+		{
+			$this->data['metadata']['playerpermission'][$player][$index]=$permission;
+			$this->save();
+		}
+		unset($player,$index,$permission);
 	}
 	
 	public function getPlayerPermission($player,$index,$default=false)
@@ -136,7 +146,7 @@ class Residence
 			$player=$player->getName();
 		}
 		$player=strtolower($player);
-		return isset($this->data['metadata']['playerpermission'][$player][$index])?$this->data['metadata']['playerpermission'][$player][$index]:$this->getPermission($index,$default);
+		return isset($this->data['metadata']['playerpermission'][$player][$index])?($this->data['metadata']['playerpermission'][$player][$index]=='true'):$this->getPermission($index,$default);
 	}
 	
 	public function removePlayerPermission($player,$index)
@@ -146,8 +156,27 @@ class Residence
 			$player=$player->getName();
 		}
 		$player=strtolower($player);
-		unset($this->data['metadata']['playerpermission'][$player][$index]);
+		unset($this->data['metadata']['playerpermission'][$player][$index],$player,$index);
 		$this->save();
+	}
+	
+	public function getTeleportPos()
+	{
+		if(!($level=Server::getInstance()->getLevelByName($this->data['level'])) instanceof Level)
+		{
+			unset($level);
+			return false;
+		}
+		return new Position($this->data['metadata']['teleport']['x'],$this->data['metadata']['teleport']['y'],$this->data['metadata']['teleport']['z'],$level);
+	}
+	
+	public function setTeleportPos(Position $pos)
+	{
+		$this->data['metadata']['teleport']['x']=$pos->x;
+		$this->data['metadata']['teleport']['y']=$pos->y;
+		$this->data['metadata']['teleport']['z']=$pos->z;
+		$this->save();
+		unset($pos);
 	}
 	
 	public function inResidence(Vector3 $pos,$level='')
@@ -175,3 +204,4 @@ class Residence
 		return false;
 	}
 }
+?>

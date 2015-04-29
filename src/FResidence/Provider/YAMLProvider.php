@@ -46,7 +46,11 @@ class YAMLProvider implements DataProvider
 				'message'=>array(
 					'enter'=>'欢迎来到 %name ,这里是 %owner 的领地',
 					'leave'=>'你离开了 %name',
-					'permission'=>'你没有权限使用这块领地'))));
+					'permission'=>'你没有权限使用这块领地'),
+				'teleport'=>array(
+					'x'=>(int)$startpos->getX(),
+					'y'=>(int)$startpos->getY(),
+					'z'=>(int)$startpos->getZ()))));
 		$this->save();
 		unset($startpos,$endpos,$owner,$name);
 		return count($this->Residences)-1;
