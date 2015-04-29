@@ -19,6 +19,7 @@ use pocketmine\utils\TextFormat;
 
 use pocketmine\event\block\BlockBreakEvent;
 use pocketmine\event\block\BlockPlaceEvent;
+use pocketmine\event\block\BlockUpdateEvent;
 
 use pocketmine\event\player\PlayerJoinEvent;
 use pocketmine\event\player\PlayerQuitEvent;
@@ -382,7 +383,7 @@ class Main extends PluginBase implements Listener
 				break;
 			}
 			$args[2]=strtolower($args[2]);
-			if($args[2]!='move' && $args[2]!='build' && $args[2]!='use' && $args[2]!='pvp' && $args[2]!='damage' && $args[2]!='tp')
+			if($args[2]!='move' && $args[2]!='build' && $args[2]!='use' && $args[2]!='pvp' && $args[2]!='damage' && $args[2]!='tp' && $args[2]!='flow')
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限索引 ,只能为以下值的任意一个 :'.self::$NL.
 					'move - 玩家移动权限'.self::$NL.
@@ -390,7 +391,8 @@ class Main extends PluginBase implements Listener
 					'use - 使用工作台/箱子等权限'.self::$NL.
 					'pvp - PVP权限'.self::$NL.
 					'damage - 是否能受到伤害'.self::$NL.
-					'tp - 传送到此领地的权限');
+					'tp - 传送到此领地的权限'.self::$NL.
+					'flow - 液体流动权限');
 				break;
 			}
 			$args[3]=strtolower($args[3]);
@@ -605,7 +607,7 @@ class Main extends PluginBase implements Listener
 	
 	public function onBlockPlace(BlockPlaceEvent $event)
 	{
-		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
+		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
 		{
 			$msg=$res->getMessage('permission');
 			$event->getPlayer()->sendMessage($msg);
@@ -616,7 +618,7 @@ class Main extends PluginBase implements Listener
 	
 	public function onBlockBreak(BlockBreakEvent $event)
 	{
-		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
+		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
 		{
 			$msg=$res->getMessage('permission');
 			$event->getPlayer()->sendMessage($msg);
@@ -629,6 +631,15 @@ class Main extends PluginBase implements Listener
 			$event->setCancelled();
 		}
 		unset($event,$res,$msg);
+	}
+	
+	public function onBlockUpdate(BlockUpdateEvent $event)
+	{
+		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res=$event->getBlock()->getId()>=8 && $event->getBlock()->getId()<=11 && !$res->getPermission('flow',true))
+		{
+			$event->setCancelled();
+		}
+		unset($event,$res);
 	}
 	
 	public function onEntityDamage(EntityDamageEvent $event)

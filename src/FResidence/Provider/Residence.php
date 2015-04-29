@@ -17,7 +17,8 @@ class Residence
 		'use'=>'false',
 		'pvp'=>'true',
 		'damage'=>'true',
-		'tp'=>'false');
+		'tp'=>'false',
+		'flow'=>'true');
 	private $provider;
 	private $__rid=-1;
 	private $data;
