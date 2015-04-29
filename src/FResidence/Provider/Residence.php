@@ -63,7 +63,7 @@ class Residence
 	
 	public function getOwner()
 	{
-		return $this->data['owner'];
+		return strtolower($this->data['owner']);
 	}
 	
 	public function setOwner($owner)
