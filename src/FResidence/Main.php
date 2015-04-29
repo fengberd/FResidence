@@ -281,7 +281,7 @@ class Main extends PluginBase implements Listener
 			$res->setMessage($args[2],$args[3]);
 			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 领地消息设置成功');
 			break;
-		case 'permission':
+		case 'set':
 			if(!isset($args[3]))
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
@@ -313,6 +313,48 @@ class Main extends PluginBase implements Listener
 			$res->setPermission($args[2],$args[3]);
 			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 领地权限设置成功');
 			break;
+		case 'pset':
+			if(!isset($args[4]))
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				break;
+			}
+			$args[2]=strtolower($args[2]);
+			if($args[2]=='' || preg_match('#^[a-zA-Z0-9_]{3,16}$#', $args[2])==0)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 无效的用户名');
+				break;
+			}
+			$args[3]=strtolower($args[3]);
+			if($args[3]!='move' && $args[3]!='build' && $args[3]!='use' && $args[3]!='attack')
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限索引 ,只能为以下值的任意一个 :'.self::$NL.
+					'move - 玩家移动权限'.self::$NL.
+					'build - 破坏/放置权限'.self::$NL.
+					'use - 使用工作台/箱子等权限'.self::$NL.
+					'attack - 攻击权限');
+				break;
+			}
+			$args[4]=strtolower($args[4]);
+			if($args[4]!='true' && $args[4]!='false' && $args[4]!='remove')
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限值 ,只能为以下值的任意一个 :'.self::$NL.TextFormat::RED.'true - 开放此权限'.self::$NL.TextFormat::RED.'false - 只有你自己能使用这个权限');
+				break;
+			}
+			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
+			if($res===false)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 不存在这块领地');
+				break;
+			}
+			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()))
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限修改这块领地的权限');
+				break;
+			}
+			$res->setPlayerPermission($args[2],$args[3],$args[4]);
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 成功设置玩家 '.$args[2].' 的领地权限 '.$args[3]);
+			break;
 		case 'help':
 		case '？':
 		case '?':
@@ -321,7 +363,8 @@ class Main extends PluginBase implements Listener
 			$help.='/res remove <名称> - 移除指定名称的领地'.self::$NL;
 			$help.=TextFormat::RED.'/res removeall '.($sender instanceof Player?'':'<玩家ID> ').'- 移除'.($sender instanceof Player?'你':'某玩家').'的所有领地'.self::$NL;
 			$help.='/res message <领地> <索引> <内容> - 设置领地的消息内容'.self::$NL;
-			$help.='/res permission <领地> <索引> <true/false> - 设置领地权限'.self::$NL;
+			$help.='/res set <领地> <权限> <true/false> - 设置领地权限'.self::$NL;
+			$help.='/res pset <领地> <玩家> <权限> <true/false> - 设置某玩家的领地权限'.self::$NL;
 			$help.='/res help - 查看帮助'.self::$NL;
 			$sender->sendMessage($help);
 			break;
@@ -337,7 +380,7 @@ class Main extends PluginBase implements Listener
 	{
 		if($event->getAction()==PlayerInteractEvent::RIGHT_CLICK_BLOCK)
 		{
-			if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$event->getPlayer()->isOp() && ($this->isProtectBlock($event->getBlock()) || $this->isBlockedItem($event->getItem())) && !$res->getPermission('use'))
+			if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$event->getPlayer()->isOp() && ($this->isProtectBlock($event->getBlock()) || $this->isBlockedItem($event->getItem())) && !$res->getPlayerPermission($event->getPlayer()->getName(),'use'))
 			{
 				$msg=$res->getMessage('permission');
 				$event->getPlayer()->sendMessage($msg);
@@ -368,7 +411,7 @@ class Main extends PluginBase implements Listener
 	public function onPlayerMove(PlayerMoveEvent $event)
 	{
 		$res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getTo()));
-		if($res!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$event->getPlayer()->isOp() && !$res->getPermission('move'))
+		if($res!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$event->getPlayer()->isOp() && !$res->getPlayerPermission($event->getPlayer()->getName(),'move'))
 		{
 			$event->setCancelled();
 			$event->getPlayer()->sendPopup($res->getMessage('permission'));
@@ -398,7 +441,7 @@ class Main extends PluginBase implements Listener
 	
 	public function onBlockPlace(BlockPlaceEvent $event)
 	{
-		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$res->getPermission('build') && !$event->getPlayer()->isOp())
+		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
 		{
 			$msg=$res->getMessage('permission');
 			$event->getPlayer()->sendMessage($msg);
@@ -409,7 +452,7 @@ class Main extends PluginBase implements Listener
 	
 	public function onBlockBreak(BlockBreakEvent $event)
 	{
-		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$res->getPermission('build') && !$event->getPlayer()->isOp())
+		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
 		{
 			$msg=$res->getMessage('permission');
 			$event->getPlayer()->sendMessage($msg);

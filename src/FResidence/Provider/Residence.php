@@ -100,6 +100,43 @@ class Residence
 		$this->save();
 	}
 	
+	public function setPlayerPermission($player,$index,$permission)
+	{
+		if($player instanceof Player)
+		{
+			$player=$player->getName();
+		}
+		$player=strtolower($player);
+		if($permission=='remove')
+		{
+			return $this->removePlayerPermission($player,$index);
+		}
+		$this->data['metadata']['playerpermission'][$player][$index]=$permission;
+		$this->save();
+		return true;
+	}
+	
+	public function getPlayerPermission($player,$index,$default=false)
+	{
+		if($player instanceof Player)
+		{
+			$player=$player->getName();
+		}
+		$player=strtolower($player);
+		return isset($this->data['metadata']['playerpermission'][$player][$index])?$this->data['metadata']['playerpermission'][$player][$index]:$this->getPermission($index,$default);
+	}
+	
+	public function removePlayerPermission($player,$index)
+	{
+		if($player instanceof Player)
+		{
+			$player=$player->getName();
+		}
+		$player=strtolower($player);
+		unset($this->data['metadata']['playerpermission'][$player][$index]);
+		$this->save();
+	}
+	
 	public function inResidence(Vector3 $pos,$level='')
 	{
 		if($level instanceof Level)

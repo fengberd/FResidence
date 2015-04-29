@@ -45,6 +45,12 @@ class YAMLProvider implements DataProvider
 					'move'=>'true',
 					'build'=>'false',
 					'use'=>'false'),
+				'playerpermission'=>array(
+					/*
+					'baka_f'=>array(
+						'move'=>'true',
+						'build'=>'true');
+					*/),
 				'message'=>array(
 					'enter'=>'欢迎来到 %name ,这里是 %owner 的领地',
 					'leave'=>'你离开了 %name',
@@ -61,6 +67,10 @@ class YAMLProvider implements DataProvider
 	
 	public function getResidence($resid)
 	{
+		if($resid===false)
+		{
+			return false;
+		}
 		return isset($this->Residences[$resid])?$this->Residences[$resid]:false;
 	}
 	
