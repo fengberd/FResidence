@@ -253,10 +253,75 @@ class Main extends PluginBase implements Listener
 			{
 				$page=1;
 			}
-			$help=TextFormat::GREEN.'====玩家 '.$target.' 领地列表===='.self::$NL;
-			foreach($this->provider->queryResidencesByOwner($target) as $key=>$res)
+			$arr=$this->provider->queryResidencesByOwner($target);
+			if(count($arr)==0)
 			{
-				//if($page*5<$key && ($page+1)*5>$key)
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 该玩家没有任何一块领地');
+				break;
+			}
+			if(($page-1)*5>count($arr))
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 页码超出范围');
+				break;
+			}
+			$all=(int)(count($arr)/5);
+			if($all<=0)
+			{
+				$all=0;
+			}
+			$all++;
+			$help=TextFormat::GREEN.'====Residence List ['.$page.'/'.$all.']===='.self::$NL;
+			$page--;
+			foreach($arr as $key=>$res)
+			{
+				if($page*5<=$key && ($page+1)*5>$key)
+				{
+					$help.=TextFormat::YELLOW.$res->getName().' - 大小 '.$res->getSize().' 方块'.self::$NL;
+				}
+				unset($res,$key);
+			}
+			$sender->sendMessage($help);
+			break;
+		case 'listall':
+			if(!$sender->isOp())
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限使用这个指令');
+				break;
+			}
+			if(!isset($args[1]))
+			{
+				$page=1;
+			}
+			else
+			{
+				$page=(int)$args[1];
+			}
+			if($page<=0)
+			{
+				$page=1;
+			}
+			$arr=$this->provider->getAllResidences();
+			if(count($arr)==0)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 服务器里还没创建过任何领地');
+				break;
+			}
+			if(($page-1)*5>count($arr))
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 页码超出范围');
+				break;
+			}
+			$all=(int)(count($arr)/5);
+			if($all<=0)
+			{
+				$all=0;
+			}
+			$all++;
+			$help=TextFormat::GREEN.'====All Residences ['.$page.'/'.$all.']===='.self::$NL;
+			$page--;
+			foreach($arr as $key=>$res)
+			{
+				if($page*5<=$key && ($page+1)*5>$key)
 				{
 					$help.=TextFormat::YELLOW.$res->getName().' - 大小 '.$res->getSize().' 方块'.self::$NL;
 				}
@@ -479,7 +544,7 @@ class Main extends PluginBase implements Listener
 	{
 		if($event->getAction()==PlayerInteractEvent::RIGHT_CLICK_BLOCK)
 		{
-			if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$event->getPlayer()->isOp() && ($this->isProtectBlock($event->getBlock()) || $this->isBlockedItem($event->getItem())) && !$res->getPlayerPermission($event->getPlayer()->getName(),'use'))
+			if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$event->getPlayer()->isOp() && ($this->isProtectBlock($event->getBlock()) || $this->isBlockedItem($event->getItem())) && !$res->getPlayerPermission($event->getPlayer()->getName(),'use'))
 			{
 				$msg=$res->getMessage('permission');
 				$event->getPlayer()->sendMessage($msg);
@@ -510,7 +575,7 @@ class Main extends PluginBase implements Listener
 	public function onPlayerMove(PlayerMoveEvent $event)
 	{
 		$res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getTo()));
-		if($res!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$event->getPlayer()->isOp() && !$res->getPlayerPermission($event->getPlayer()->getName(),'move'))
+		if($res!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$event->getPlayer()->isOp() && !$res->getPlayerPermission($event->getPlayer()->getName(),'move'))
 		{
 			$event->setCancelled();
 			$event->getPlayer()->sendPopup($res->getMessage('permission'));
@@ -540,7 +605,7 @@ class Main extends PluginBase implements Listener
 	
 	public function onBlockPlace(BlockPlaceEvent $event)
 	{
-		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
+		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
 		{
 			$msg=$res->getMessage('permission');
 			$event->getPlayer()->sendMessage($msg);
@@ -551,7 +616,7 @@ class Main extends PluginBase implements Listener
 	
 	public function onBlockBreak(BlockBreakEvent $event)
 	{
-		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==$event->getPlayer()->getName() && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
+		if(($res=$this->provider->queryResidenceByPosition($event->getBlock()))!==false && ($res=$this->provider->getResidence($res))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
 		{
 			$msg=$res->getMessage('permission');
 			$event->getPlayer()->sendMessage($msg);
@@ -572,7 +637,7 @@ class Main extends PluginBase implements Listener
 		{
 			$event->setCancelled();
 		}
-		else if($event instanceof EntityDamageByEntityEvent && $event->getDamager() instanceof Player && $event->getEntity() instanceof Player && $res!==false && !($res->getPlayerPermission($event->getDamager(),'pvp',true) && $res->getPlayerPermission($event->getEntity(),'pvp',true)))
+		else if($event instanceof EntityDamageByEntityEvent && $event->getDamager() instanceof Player && $event->getEntity() instanceof Player && $res!==false && strtolower($event->getDamager()->getName())!=$res->getOwner() && !$event->getDamager()->isOp() && !($res->getPlayerPermission($event->getDamager(),'pvp',true) && $res->getPlayerPermission($event->getEntity(),'pvp',true)))
 		{
 			$event->setCancelled();
 			$msg=$res->getMessage('permission');
