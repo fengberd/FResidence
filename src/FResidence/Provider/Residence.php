@@ -9,6 +9,12 @@ use pocketmine\level\Level;
 
 class Residence
 {
+	public static $DefaultPermission=array(
+		'move'=>'true',
+		'build'=>'false',
+		'use'=>'false',
+		'pvp'=>'true',
+		'damage'=>'true');
 	private $provider;
 	private $__rid=-1;
 	private $data;
@@ -86,6 +92,13 @@ class Residence
 	public function setMessage($index,$message)
 	{
 		$this->data['metadata']['message'][$index]=$message;
+		$this->save();
+	}
+	
+	public function resetPermission()
+	{
+		$this->data['metadata']['permission']=Residence::$DefaultPermission;
+		$this->data['metadata']['playerpermission']=array();
 		$this->save();
 	}
 	

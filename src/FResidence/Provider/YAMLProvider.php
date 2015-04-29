@@ -41,16 +41,8 @@ class YAMLProvider implements DataProvider
 			'level'=>$startpos->getLevel()->getFolderName(),
 			'owner'=>$owner,
 			'metadata'=>array(
-				'permission'=>array(
-					'move'=>'true',
-					'build'=>'false',
-					'use'=>'false'),
-				'playerpermission'=>array(
-					/*
-					'baka_f'=>array(
-						'move'=>'true',
-						'build'=>'true');
-					*/),
+				'permission'=>Residence::$DefaultPermission,
+				'playerpermission'=>array(),
 				'message'=>array(
 					'enter'=>'欢迎来到 %name ,这里是 %owner 的领地',
 					'leave'=>'你离开了 %name',

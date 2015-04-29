@@ -25,6 +25,9 @@ use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\event\player\PlayerMoveEvent;
 use pocketmine\event\player\PlayerInteractEvent;
 
+use pocketmine\event\entity\EntityDamageEvent;
+use pocketmine\event\entity\EntityDamageByEntityEvent;
+
 use FResidence\Provider\YAMLProvider;
 
 class Main extends PluginBase implements Listener
@@ -279,7 +282,27 @@ class Main extends PluginBase implements Listener
 				break;
 			}
 			$res->setMessage($args[2],$args[3]);
-			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 领地消息设置成功');
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 成功设置领地 '.$args[1].' 的 '.$args[2].' 消息数据');
+			break;
+		case 'default':
+			if(!isset($args[1]))
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				break;
+			}
+			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
+			if($res===false)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 不存在这块领地');
+				break;
+			}
+			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()))
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限修改这块领地的权限');
+				break;
+			}
+			$res->resetPermission();
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 成功重置领地 '.$args[1].' 的权限数据');
 			break;
 		case 'set':
 			if(!isset($args[3]))
@@ -288,9 +311,14 @@ class Main extends PluginBase implements Listener
 				break;
 			}
 			$args[2]=strtolower($args[2]);
-			if($args[2]!='move' && $args[2]!='build' && $args[2]!='use' && $args[2]!='attack')
+			if($args[2]!='move' && $args[2]!='build' && $args[2]!='use' && $args[2]!='pvp' && $args[2]!='damage')
 			{
-				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限索引 ,只能为以下值的任意一个 :'.self::$NL.'move - 玩家移动权限'.self::$NL.'build - 破坏/放置权限'.self::$NL.'use - 使用工作台/箱子等权限'.self::$NL.'attack - 攻击权限');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限索引 ,只能为以下值的任意一个 :'.self::$NL.
+					'move - 玩家移动权限'.self::$NL.
+					'build - 破坏/放置权限'.self::$NL.
+					'use - 使用工作台/箱子等权限'.self::$NL.
+					'pvp - PVP权限'.self::$NL.
+					'damage - 是否能受到伤害');
 				break;
 			}
 			$args[3]=strtolower($args[3]);
@@ -311,7 +339,7 @@ class Main extends PluginBase implements Listener
 				break;
 			}
 			$res->setPermission($args[2],$args[3]);
-			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 领地权限设置成功');
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 成功设置领地 '.$args[1].' 的权限 '.$args[2]);
 			break;
 		case 'pset':
 			if(!isset($args[4]))
@@ -326,13 +354,14 @@ class Main extends PluginBase implements Listener
 				break;
 			}
 			$args[3]=strtolower($args[3]);
-			if($args[3]!='move' && $args[3]!='build' && $args[3]!='use' && $args[3]!='attack')
+			if($args[3]!='move' && $args[3]!='build' && $args[3]!='use' && $args[3]!='pvp' && $args[3]!='admin')
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限索引 ,只能为以下值的任意一个 :'.self::$NL.
 					'move - 玩家移动权限'.self::$NL.
 					'build - 破坏/放置权限'.self::$NL.
 					'use - 使用工作台/箱子等权限'.self::$NL.
-					'attack - 攻击权限');
+					'pvp - PVP权限'.self::$NL.
+					'admin - 完全的管理权限');
 				break;
 			}
 			$args[4]=strtolower($args[4]);
@@ -465,6 +494,21 @@ class Main extends PluginBase implements Listener
 			$event->setCancelled();
 		}
 		unset($event,$res,$msg);
+	}
+	
+	public function onEntityDamage(EntityDamageEvent $event)
+	{
+		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getEntity())))!==false && !$res->getPermission('damage'))
+		{
+			$event->setCancelled();
+		}
+		else if($event instanceof EntityDamageByEntityEvent && $event->getDamager() instanceof Player && $event->getEntity() instanceof Player && $res!==false && !($res->getPlayerPermission($event->getDamager(),'pvp',true) && $res->getPlayerPermission($event->getEntity(),'pvp',true)))
+		{
+			$event->setCancelled();
+			$msg=$res->getMessage('permission');
+			$event->getDamager()->sendMessage($msg);
+		}
+		unset($res,$event,$msg);
 	}
 	
 	public function getVector3Array($pos1,$pos2)
@@ -600,9 +644,6 @@ class Main extends PluginBase implements Listener
 		case Item::BEETROOT_BLOCK:*/
 		case Item::STONECUTTER:
 		case Item::NETHER_REACTOR:
-		/*case Item:::
-		case Item:::
-		case Item:::*/
 			unset($block);
 			return true;
 		}
@@ -626,18 +667,6 @@ class Main extends PluginBase implements Listener
 		case Item::CARROT:
 		case Item::POTATO:
 		case Item::BEETROOT_SEEDS:
-		/*case Item:::
-		case Item:::
-		case Item:::
-		case Item:::
-		case Item:::
-		case Item:::
-		case Item:::
-		case Item:::
-		case Item:::
-		case Item:::
-		case Item:::
-		case Item:::*/
 			unset($item);
 			return true;
 		}
