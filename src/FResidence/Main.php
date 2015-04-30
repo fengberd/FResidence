@@ -36,8 +36,7 @@ class Main extends PluginBase implements Listener
 	private static $obj;
 	private $select=array();
 	public static $NL="\n";
-		private static $perms = {"move","build","use","pvp","damage","tp","flow"};
-
+	
 	public static function getInstance()
 	{
 		return self::$obj;
@@ -135,18 +134,16 @@ class Main extends PluginBase implements Listener
 				break;
 			}
 			$break=false;
-			$arr=$this->getVector3Array($select1,$select2);
-			$level=$sender->getLevel()->getFolderName();
-			foreach($arr as $v3)
+			foreach($this->provider->getAllResidences() as $r)
 			{
-				if($this->provider->queryResidenceByPosition($v3,$level)!==false)
+				if($this->check($r->getStart(),$r->getEnd(),$select1,$select2))
 				{
+					$sender->sendMessage(TextFormat::RED.'[FResidence] 选区与领地 '.$r->getName().' 重叠 ,不能覆盖 !');
+					unset($r);
 					$break=true;
-					$sender->sendMessage(TextFormat::RED.'[FResidence] 不能覆盖别人的领地 ,检测到覆盖坐标 :');
-					$sender->sendMessage(TextFormat::RED.'[FResidence] X:'.$v3->getX().',Y:'.$v3->getY().',Z:'.$v3->getZ());
 					break;
 				}
-				unset($v3);
+				unset($r);
 			}
 			if($break)
 			{
@@ -721,111 +718,6 @@ class Main extends PluginBase implements Listener
 		unset($event);
 	}
 	
-	public function getVector3Array($pos1,$pos2)
-	{
-		if($pos1 instanceof Vector3)
-		{
-			$x1=$pos1->getX();
-			$y1=$pos1->getY();
-			$z1=$pos1->getZ();
-		}
-		else
-		{
-			$x1=$pos1['x'];
-			$y1=$pos1['y'];
-			$z1=$pos1['z'];
-		}
-		if($pos2 instanceof Vector3)
-		{
-			$x2=$pos2->getX();
-			$y2=$pos2->getY();
-			$z2=$pos2->getZ();
-		}
-		else
-		{
-			$x2=$pos2['x'];
-			$y2=$pos2['y'];
-			$z2=$pos2['z'];
-		}
-		$return=array();
-		$lowestX=min($x1,$x2);
-		$lowestY=min($y1,$y2);
-		$lowestZ=min($z1,$z2);
-		$highestX=max($x1,$x2);
-		$highestY=max($y1,$y2);
-		$highestZ=max($z1,$z2);
-		for($x=$lowestX;$x<=$highestX;$x++)
-		{
-			for($y=$lowestY;$y<=$highestY;$y++)
-			{
-				for($z=$lowestZ;$z<=$highestZ;$z++)
-				{
-					$return[]=new Vector3($x,$y,$z);
-				}
-			}
-		}
-		unset($pos1,$pos2,$x1,$x2,$y1,$y2,$z1,$z2,$x,$y,$z,$lowestX,$lowestY,$lowestZ,$highestX,$highestY,$highestZ);
-		return $return;
-	}
-	
-	public function getBoxVector3Array($pos1,$pos2)
-	{
-		if($pos1 instanceof Vector3)
-		{
-			$x1=$pos1->getX();
-			$y1=$pos1->getY();
-			$z1=$pos1->getZ();
-		}
-		else
-		{
-			$x1=$pos1['x'];
-			$y1=$pos1['y'];
-			$z1=$pos1['z'];
-		}
-		if($pos2 instanceof Vector3)
-		{
-			$x2=$pos2->getX();
-			$y2=$pos2->getY();
-			$z2=$pos2->getZ();
-		}
-		else
-		{
-			$x2=$pos2['x'];
-			$y2=$pos2['y'];
-			$z2=$pos2['z'];
-		}
-		$return=array();
-		$n1=min($x1,$x2);
-		$n2=min($y1,$y2);
-		$n3=min($z1,$z2);
-		for($x=0;$x<=max($x1,$x2)-min($x1,$x2);$x++)
-		{
-			for($z=0;$z<=max($z1,$z2)-min($z1,$z2);$z++)
-			{
-				$return[]=new Vector3($n1+$x,$y1,$n3+$z);
-				$return[]=new Vector3($n1+$x,$y2,$n3+$z);
-			}
-		}
-		for($y=0;$y<=max($y1,$y2)-min($y1,$y2);$y++)
-		{
-			for($x=0;$x<=max($x1,$x2)-min($x1,$x2);$x++)
-			{
-				$return[]=new Vector3($n1+$x,$n2+$y,$z1);
-				$return[]=new Vector3($n1+$x,$n2+$y,$z2);
-			}
-		}
-		for($z=0;$z<=max($z1,$z2)-min($z1,$z2);$z++)
-		{
-			for($y=0;$y<=max($y1,$y2)-min($y1,$y2);$y++)
-			{
-				$return[]=new Vector3($x1,$n2+$y,$n3+$z);
-				$return[]=new Vector3($x1,$n2+$y,$n3+$z);
-			}
-		}
-		unset($pos1,$pos2,$x1,$x2,$y1,$y2,$z1,$z2,$x,$y,$z,$n1,$n2,$n3);
-		return $return;
-	}
-	
 	public function isProtectBlock(Block $block)
 	{
 		switch($block->getId())
@@ -867,6 +759,80 @@ class Main extends PluginBase implements Listener
 			return true;
 		}
 		unset($item);
+		return false;
+	}
+	
+	//领地判断算法移植自PC的Residence，若侵犯原作者权益请联系我,Gmail:FENGberd@gmail.com
+	public function check($pos1,$pos2,$pos3,$pos4)
+	{
+		if($pos1 instanceof Vector3)
+		{
+			$x1=$pos1->getX();
+			$y1=$pos1->getY();
+			$z1=$pos1->getZ();
+		}
+		else
+		{
+			$x1=$pos1['x'];
+			$y1=$pos1['y'];
+			$z1=$pos1['z'];
+		}
+		if($pos2 instanceof Vector3)
+		{
+			$x2=$pos2->getX();
+			$y2=$pos2->getY();
+			$z2=$pos2->getZ();
+		}
+		else
+		{
+			$x2=$pos2['x'];
+			$y2=$pos2['y'];
+			$z2=$pos2['z'];
+		}
+		if($pos3 instanceof Vector3)
+		{
+			$x3=$pos3->getX();
+			$y3=$pos3->getY();
+			$z3=$pos3->getZ();
+		}
+		else
+		{
+			$x3=$pos3['x'];
+			$y3=$pos3['y'];
+			$z3=$pos3['z'];
+		}
+		if($pos4 instanceof Vector3)
+		{
+			$x4=$pos4->getX();
+			$y4=$pos4->getY();
+			$z4=$pos4->getZ();
+		}
+		else
+		{
+			$x4=$pos4['x'];
+			$y4=$pos4['y'];
+			$z4=$pos4['z'];
+		}
+		$A1LX=min($x1,$x2);
+		$A1LY=min($y1,$y2);
+		$A1LZ=min($z1,$z2);
+		$A1HX=max($x1,$x2);
+		$A1HY=max($y1,$y2);
+		$A1HZ=max($z1,$z2);
+		
+		$A2LX=min($x3,$x4);
+		$A2LY=min($y3,$y4);
+		$A2LZ=min($z3,$z4);
+		$A2HX=max($x3,$x4);
+		$A2HY=max($y3,$y4);
+		$A2HZ=max($z3,$z4);
+		
+		if((($A1HX >= $A2LX) && ($A1HX <= $A2HX)) || (($A1LX >= $A2LX) && ($A1LX <= $A2HX)) || (($A2HX >= $A1LX) && ($A2HX <= $A1HX)) || (($A2LX >= $A1LX) && ($A2LX <= $A1HX) && 
+			((($A1HY >= $A2LY) && ($A1HY <= $A2HY)) || (($A1LY >= $A2LY) && ($A1LY <= $A2HY)) || (($A2HY >= $A1LY) && ($A2HY <= $A1HY)) || (($A2LY >= $A1LY) && ($A2LY <= $A1HY) && 
+			((($A1HZ >= $A2LZ) && ($A1HZ <= $A2HZ)) || (($A1LZ >= $A2LZ) && ($A1LZ <= $A2HZ)) || (($A2HZ >= $A1LZ) && ($A2HZ <= $A1HZ)) || (($A2LZ >= $A1LZ) && ($A2LZ <= $A1HZ)))))))
+		{
+			return true;
+		}
 		return false;
 	}
 }
