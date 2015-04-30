@@ -36,7 +36,8 @@ class Main extends PluginBase implements Listener
 	private static $obj;
 	private $select=array();
 	public static $NL="\n";
-	
+		private static $perms = {"move","build","use","pvp","damage","tp","flow"};
+
 	public static function getInstance()
 	{
 		return self::$obj;
@@ -404,7 +405,7 @@ class Main extends PluginBase implements Listener
 				break;
 			}
 			$args[2]=strtolower($args[2]);
-			if($args[2]!='move' && $args[2]!='build' && $args[2]!='use' && $args[2]!='pvp' && $args[2]!='damage' && $args[2]!='tp' && $args[2]!='flow')
+			if(in_array($args[2],$this->perms))
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的权限索引 ,只能为以下值的任意一个 :'.self::$NL.
 					'move - 玩家移动权限'.self::$NL.
