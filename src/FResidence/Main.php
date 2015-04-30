@@ -178,6 +178,27 @@ class Main extends PluginBase implements Listener
 			$this->provider->removeResidence($rid);
 			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 领地移除成功');
 			break;
+		case 'give':
+			if(!isset($args[2]) || $args[2]=='')
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				break;
+			}
+			$rid=$this->provider->queryResidenceByName($args[1]);
+			$res=$this->provider->getResidence($rid);
+			if($rid===false || $res===false)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 不存在这块领地');
+				break;
+			}
+			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()))
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限赠送这块领地');
+				break;
+			}
+			$res->setOwner($args[2]);
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 成功把领地 '.$args[1].' 赠送给玩家 '.$args[2]);
+			break;
 		case 'removeall':
 			if(!$sender instanceof Player)
 			{
@@ -526,10 +547,12 @@ class Main extends PluginBase implements Listener
 				$help.='/res set <领地> <权限> <true/false> - 设置领地权限'.self::$NL;
 				break;
 			case 2:
-			$help.='/res pset <领地> <玩家> <权限> <true/false> - 设置某玩家的领地权限'.self::$NL;
-			$help.='/res tp <领地> - 传送到某领地'.self::$NL;
-			$help.='/res tpset - 设置当前坐标为当前领地传送点'.self::$NL;
-			$help.='/res help - 查看帮助'.self::$NL;
+				$help.='/res pset <领地> <玩家> <权限> <true/false> - 设置某玩家的领地权限'.self::$NL;
+				$help.='/res give <领地> <玩家> - 把领地赠送给某玩家'.self::$NL;
+				$help.='/res tp <领地> - 传送到某领地'.self::$NL;
+				$help.='/res tpset - 设置当前坐标为当前领地传送点'.self::$NL;
+				$help.='/res help - 查看帮助'.self::$NL;
+				break;
 			}
 			$help='=====FResidence commands ['.$page.'/2]====='.self::$NL.$help;
 			$sender->sendMessage($help);
