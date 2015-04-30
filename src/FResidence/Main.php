@@ -836,9 +836,9 @@ class Main extends PluginBase implements Listener
 		case Item::IRON_DOOR_BLOCK:
 		case Item::TRAPDOOR:
 		case Item::FENCE_GATE:
-		case 126:
 		case Item::STONECUTTER:
 		case Item::NETHER_REACTOR:
+		case 126:
 			unset($block);
 			return true;
 		}
