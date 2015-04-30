@@ -1,4 +1,6 @@
 <?php
+namespace FResidence;
+
 class PlayerInfo
 {
 	public $p1=false;
