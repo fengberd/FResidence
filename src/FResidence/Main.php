@@ -98,6 +98,23 @@ class Main extends PluginBase implements Listener
 		}
 		switch($args[0])
 		{
+		case 'parseeconomy':
+			if($sender instanceof Player)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限使用这个指令');
+				break;
+			}
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 开始转换领地数据');
+			$land=new Config($this->getDataFolder().'../EconomyLand/Land.yml',Config::YAML,array());
+			$cou=0;
+			foreach($land->getAll() as $l)
+			{
+				$this->provider->addResidence(new Vector3($l['startX'],0,$l['startZ']),new Vector3($l['endX'],128,$l['endZ']),$l['owner'],'parse_'.$l['ID'],$l['level']);
+				$cou++;
+				unset($l);
+			}
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 数据转换完成,共处理 '.$cou.' 块领地');
+			break;
 		case 'create':
 			if(!$sender instanceof Player)
 			{

@@ -6,7 +6,7 @@ use FResidence\Main;
 interface DataProvider
 {
 	public function __construct(Main $main);
-	public function addResidence($startpos,$endpos,$owner,$name);
+	public function addResidence($startpos,$endpos,$owner,$name,$level);
 	
 	public function getAllResidences();
 	public function getResidence($resid);

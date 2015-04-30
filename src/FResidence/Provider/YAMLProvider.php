@@ -21,7 +21,7 @@ class YAMLProvider implements DataProvider
 		unset($main);
 	}
 	
-	public function addResidence($startpos,$endpos,$owner,$name)
+	public function addResidence($startpos,$endpos,$owner,$name,$level=false)
 	{
 		if($owner instanceof Player)
 		{
@@ -38,7 +38,7 @@ class YAMLProvider implements DataProvider
 				'x'=>(int)$endpos->getX(),
 				'y'=>(int)$endpos->getY(),
 				'z'=>(int)$endpos->getZ()),
-			'level'=>$startpos->getLevel()->getFolderName(),
+			'level'=>($level===false?$startpos->getLevel()->getFolderName():$level),
 			'owner'=>$owner,
 			'metadata'=>array(
 				'permission'=>Residence::$DefaultPermission,
