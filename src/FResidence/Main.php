@@ -542,6 +542,11 @@ class Main extends PluginBase implements Listener
 		return true;
 	}
 	
+	/**
+	 * @param PlayerInteractEvent $event
+	 *
+	 * @priority MONITOR
+	 */
 	public function onPlayerInteract(PlayerInteractEvent $event)
 	{
 		if($event->getAction()==PlayerInteractEvent::RIGHT_CLICK_BLOCK)
@@ -562,18 +567,11 @@ class Main extends PluginBase implements Listener
 		unset($event,$res,$msg);
 	}
 	
-	public function onPlayerJoin(PlayerJoinEvent $event)
-	{
-		$this->select[$event->getPlayer()->getName()]=new PlayerInfo();
-		unset($event);
-	}
-	
-	public function onPlayerQuit(PlayerQuitEvent $event)
-	{
-		unset($this->select[$event->getPlayer()->getName()]);
-		unset($event);
-	}
-	
+	/**
+	 * @param PlayerMoveEvent $event
+	 *
+	 * @priority MONITOR
+	 */
 	public function onPlayerMove(PlayerMoveEvent $event)
 	{
 		$res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getTo()));
@@ -605,6 +603,11 @@ class Main extends PluginBase implements Listener
 		unset($event,$res,$msg);
 	}
 	
+	/**
+	 * @param BlockPlaceEvent $event
+	 *
+	 * @priority MONITOR
+	 */
 	public function onBlockPlace(BlockPlaceEvent $event)
 	{
 		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
@@ -616,6 +619,11 @@ class Main extends PluginBase implements Listener
 		unset($event,$res,$msg);
 	}
 	
+	/**
+	 * @param BlockBreakEvent $event
+	 *
+	 * @priority MONITOR
+	 */
 	public function onBlockBreak(BlockBreakEvent $event)
 	{
 		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
@@ -633,6 +641,11 @@ class Main extends PluginBase implements Listener
 		unset($event,$res,$msg);
 	}
 	
+	/**
+	 * @param BlockUpdateEvent $event
+	 *
+	 * @priority MONITOR
+	 */
 	public function onBlockUpdate(BlockUpdateEvent $event)
 	{
 		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res=$event->getBlock()->getId()>=8 && $event->getBlock()->getId()<=11 && !$res->getPermission('flow',true))
@@ -642,6 +655,11 @@ class Main extends PluginBase implements Listener
 		unset($event,$res);
 	}
 	
+	/**
+	 * @param EntityDamageEvent $event
+	 *
+	 * @priority MONITOR
+	 */
 	public function onEntityDamage(EntityDamageEvent $event)
 	{
 		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getEntity())))!==false && !$res->getPermission('damage'))
@@ -655,6 +673,28 @@ class Main extends PluginBase implements Listener
 			$event->getDamager()->sendMessage($msg);
 		}
 		unset($res,$event,$msg);
+	}
+	
+	/**
+	 * @param PlayerJoinEvent $event
+	 *
+	 * @priority NORMAL
+	 */
+	public function onPlayerJoin(PlayerJoinEvent $event)
+	{
+		$this->select[$event->getPlayer()->getName()]=new PlayerInfo();
+		unset($event);
+	}
+	
+	/**
+	 * @param PlayerQuitEvent $event
+	 *
+	 * @priority NORMAL
+	 */
+	public function onPlayerQuit(PlayerQuitEvent $event)
+	{
+		unset($this->select[$event->getPlayer()->getName()]);
+		unset($event);
 	}
 	
 	public function getVector3Array($pos1,$pos2)
@@ -766,28 +806,14 @@ class Main extends PluginBase implements Listener
 	{
 		switch($block->getId())
 		{
-		//case Item::GRASS:
-		//case Item::DIRT:
 		case Item::BED_BLOCK:
-		//case Item::TNT:
-		//case Item::FIRE:
-		//case Item::MONSTER_SPAWNER:
 		case Item::CHEST:
 		case Item::CRAFTING_TABLE:
 		case Item::DOOR_BLOCK:
-		//case 27:
-		//case 66:
 		case Item::IRON_DOOR_BLOCK:
 		case Item::TRAPDOOR:
-		//case Item::PUMPKIN_STEM:
-		//case Item::MELON_STEM:
 		case Item::FENCE_GATE:
-		//case Item::END_PORTAL:
 		case 126:
-		/*case Item::CARROT_BLOCK:
-		case Item::POTATO_BLOCK:
-		case Item::PODZOL:
-		case Item::BEETROOT_BLOCK:*/
 		case Item::STONECUTTER:
 		case Item::NETHER_REACTOR:
 			unset($block);
@@ -818,40 +844,6 @@ class Main extends PluginBase implements Listener
 		}
 		unset($item);
 		return false;
-	}
-}
-
-class PlayerInfo
-{
-	public $p1=false;
-	public $p2=false;
-	public $nowland=false;
-	
-	public function isSelectFinish()
-	{
-		return ($this->p1!==false && $this->p2!==false);
-	}
-	
-	public function getP1()
-	{
-		return $this->p1;
-	}
-	
-	public function getP2()
-	{
-		return $this->p2;
-	}
-	
-	public function setP1($pos)
-	{
-		$this->p1=$pos;
-		unset($pos);
-	}
-	
-	public function setP2($pos)
-	{
-		$this->p2=$pos;
-		unset($pos);
 	}
 }
 ?>
