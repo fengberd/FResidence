@@ -31,6 +31,9 @@ use pocketmine\event\entity\EntityDamageByEntityEvent;
 
 use FResidence\Provider\YAMLProvider;
 
+use FResidence\event\ResidenceAddEvent;
+use FResidence\event\ResidenceRemoveEvent;
+
 class Main extends PluginBase implements Listener
 {
 	private static $obj;
@@ -166,8 +169,13 @@ class Main extends PluginBase implements Listener
 			{
 				break;
 			}
-			$this->provider->addResidence($select1,$select2,$sender,$args[1]);
-			IncludeAPI::Economy_setMoney($sender,IncludeAPI::Economy_getMoney($sender)-$money);
+			$this->getServer()->getPluginManager()->callEvent($ev=new ResidenceAddEvent($this,$money,$select1,$select2,$args[1],$sender));
+			if($ev->isCancelled())
+			{
+				break;
+			}
+			$this->provider->addResidence($ev->getPos1(),$ev->getPos2(),$sender,$ev->getResName());
+			IncludeAPI::Economy_setMoney($sender,IncludeAPI::Economy_getMoney($sender)-$ev->getMoney());
 			$this->select[$sender->getName()]->setP1(false);
 			$this->select[$sender->getName()]->setP2(false);
 			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 领地创建成功 ,花费 '.$money.' '.$this->moneyName);
@@ -188,6 +196,11 @@ class Main extends PluginBase implements Listener
 			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()))
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限移除这块领地');
+				break;
+			}
+			$this->getServer()->getPluginManager()->callEvent($ev=new ResidenceRemoveEvent($this,$res));
+			if($ev->isCancelled())
+			{
 				break;
 			}
 			$this->provider->removeResidence($rid);
