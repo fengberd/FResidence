@@ -563,6 +563,7 @@ class Main extends PluginBase implements Listener
 			{
 				$page=1;
 			}
+			$help='';
 			switch($page)
 			{
 			default:
