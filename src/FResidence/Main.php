@@ -52,12 +52,8 @@ class Main extends PluginBase implements Listener
 		return self::$obj;
 	}
 	
-	public function onEnable()
+	public function loadConfig()
 	{
-		if(!self::$obj instanceof Main)
-		{
-			self::$obj=$this;
-		}
 		@mkdir($this->getDataFolder());
 		$this->config=new Config($this->getDataFolder().'config.yml',Config::YAML,array());
 		$names=array(
@@ -80,6 +76,16 @@ class Main extends PluginBase implements Listener
 		$this->landItem=(int)$this->config->get('landItem');
 		$this->blockMoney=$this->config->get('blockMoney')*1;
 		$this->moneyName=$this->config->get('moneyName');
+		$this->config->save();
+	}
+	
+	public function onEnable()
+	{
+		if(!self::$obj instanceof Main)
+		{
+			self::$obj=$this;
+		}
+		$this->loadConfig();
 		switch(strtolower($this->config->get('Provider')))
 		{
 		/*case 'mysql':
@@ -94,7 +100,6 @@ class Main extends PluginBase implements Listener
 			$this->provider=new YAMLProvider($this);
 			break;
 		}
-		$this->config->save();
 		$this->getServer()->getPluginManager()->registerEvents($this,$this);
 	}
 	
@@ -104,10 +109,20 @@ class Main extends PluginBase implements Listener
 		{
 			$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
 			unset($sender,$command,$label,$args);
-			return;
+			return true;
 		}
 		switch($args[0])
 		{
+		case 'reload':
+			if(!$sender->isOp())
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 权限不足');
+				unset($sender,$command,$label,$args);
+				return false;
+			}
+			$this->loadConfig();
+			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 重载完成');
+			break;
 		case 'parseeconomy':
 			if($sender instanceof Player)
 			{
