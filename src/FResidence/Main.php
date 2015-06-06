@@ -100,6 +100,7 @@ class Main extends PluginBase implements Listener
 			$this->provider=new YAMLProvider($this);
 			break;
 		}
+		Item::addCreativeItem(Item::get($this->landItem,0));
 		$this->getServer()->getPluginManager()->registerEvents($this,$this);
 	}
 	
