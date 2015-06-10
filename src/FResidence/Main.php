@@ -209,6 +209,11 @@ class Main extends PluginBase implements Listener
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
 				break;
 			}
+			if($args[1]=='spawn' && $sender instanceof Player)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 权限不足');
+				break;
+			}
 			$rid=$this->provider->queryResidenceByName($args[1]);
 			$res=$this->provider->getResidence($rid);
 			if($rid===false || $res===false)
@@ -233,6 +238,11 @@ class Main extends PluginBase implements Listener
 			if(!isset($args[2]) || $args[2]=='')
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				break;
+			}
+			if($args[1]=='spawn' && $sender instanceof Player)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 权限不足');
 				break;
 			}
 			$rid=$this->provider->queryResidenceByName($args[1]);
@@ -408,6 +418,11 @@ class Main extends PluginBase implements Listener
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
 				break;
 			}
+			if($args[1]=='spawn' && $sender instanceof Player)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 权限不足');
+				break;
+			}
 			$args[2]=strtolower($args[2]);
 			if($args[2]!='enter' && $args[2]!='leave' && $args[2]!='permission')
 			{
@@ -434,6 +449,11 @@ class Main extends PluginBase implements Listener
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
 				break;
 			}
+			if($args[1]=='spawn' && $sender instanceof Player)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 权限不足');
+				break;
+			}
 			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
 			if($res===false)
 			{
@@ -452,6 +472,11 @@ class Main extends PluginBase implements Listener
 			if(!isset($args[3]))
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				break;
+			}
+			if($args[1]=='spawn' && $sender instanceof Player)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 权限不足');
 				break;
 			}
 			$args[2]=strtolower($args[2]);
@@ -491,6 +516,11 @@ class Main extends PluginBase implements Listener
 			if(!isset($args[4]))
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				break;
+			}
+			if($args[1]=='spawn' && $sender instanceof Player)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 权限不足');
 				break;
 			}
 			$args[2]=strtolower($args[2]);
@@ -547,7 +577,7 @@ class Main extends PluginBase implements Listener
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 不存在这块领地');
 				break;
 			}
-			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()) && !$this->provider->getPlayerPermission($sender->getName(),'tp'))
+			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()) && !$res->getPlayerPermission($sender->getName(),'tp'))
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限传送到这块领地');
 				break;
@@ -757,7 +787,7 @@ class Main extends PluginBase implements Listener
 	 */
 	public function onPlayerJoin(PlayerJoinEvent $event)
 	{
-		$this->select[$event->getPlayer()->getName()]=new PlayerInfo();
+		$this->select[$event->getPlayer()->getName()]=new PlayerInfo($event->getPlayer());
 		unset($event);
 	}
 	
@@ -768,7 +798,10 @@ class Main extends PluginBase implements Listener
 	 */
 	public function onPlayerQuit(PlayerQuitEvent $event)
 	{
-		unset($this->select[$event->getPlayer()->getName()]);
+		if(isset($this->select[$event->getPlayer()->getName()]) && !$this->select[$event->getPlayer()->getName()]->player->isConnected())
+		{
+			unset($this->select[$event->getPlayer()->getName()]);
+		}
 		unset($event);
 	}
 	

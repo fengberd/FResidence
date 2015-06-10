@@ -5,7 +5,13 @@ class PlayerInfo
 {
 	public $p1=false;
 	public $p2=false;
+	public $player=false;
 	public $nowland=false;
+	
+	public function __construct($player)
+	{
+		$this->player=$player;
+	}
 	
 	public function isSelectFinish()
 	{

@@ -1,6 +1,6 @@
 name: FResidence
 main: FResidence\Main
-version: 1.0.0
+version: 1.0.1
 api: [1.0.0]
 load: POSTWORLD
 author: FENGberd
@@ -16,7 +16,7 @@ permissions:
   default: true
  FResidence.command.*:
   description: 使用命令权限
-  default: true
- FResidence.command.resistance:
+  default: op
+ FResidence.command.residence:
   description: 领地主指令
   default: true
