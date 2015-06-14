@@ -124,7 +124,7 @@ class Main extends PluginBase implements Listener
 			$this->loadConfig();
 			$sender->sendMessage(TextFormat::GREEN.'[FResidence] 重载完成');
 			break;
-		case 'parseeconomy':
+		case 'parse':
 			if($sender instanceof Player)
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限使用这个指令');
@@ -635,8 +635,12 @@ class Main extends PluginBase implements Listener
 				$help.='/res tpset - 设置当前坐标为当前领地传送点'.self::$NL;
 				$help.='/res help - 查看帮助'.self::$NL;
 				break;
+			case 3:
+				$help.='/res info <领地> - 查询指定领地信息'.self::$NL;
+				$help.='/res current - 查询当前所在领地信息'.self::$NL;
+				break;
 			}
-			$help='=====FResidence commands ['.$page.'/2]====='.self::$NL.$help;
+			$help='=====FResidence commands ['.$page.'/3]====='.self::$NL.$help;
 			$sender->sendMessage($help);
 			break;
 		default:
