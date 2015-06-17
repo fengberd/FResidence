@@ -179,7 +179,7 @@ class Main extends PluginBase implements Listener
 			$break=false;
 			foreach($this->provider->getAllResidences() as $r)
 			{
-				if($this->check($r->getStart(),$r->getEnd(),$select1,$select2))
+				if($r->getLevel()==$select1->getLevel()->getFolderName() && $this->check($r->getStart(),$r->getEnd(),$select1,$select2))
 				{
 					$sender->sendMessage(TextFormat::RED.'[FResidence] 选区与领地 '.$r->getName().' 重叠 ,不能覆盖 !');
 					unset($r);
