@@ -170,6 +170,11 @@ class Main extends PluginBase implements Listener
 			}
 			$select1=$this->select[$sender->getName()]->getP1();
 			$select2=$this->select[$sender->getName()]->getP2();
+			if($select1->getLevel()->getFolderName()!=$select2->getLevel()->getFolderName())
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 请在同一个世界选点圈地');
+				break;
+			}
 			$money=$this->blockMoney*abs($select1->getX()-$select2->getX())*abs($select1->getY()-$select2->getY())*abs($select1->getZ()-$select2->getZ());
 			if(!$sender->isOp() && $money>IncludeAPI::Economy_getMoney($sender))
 			{
