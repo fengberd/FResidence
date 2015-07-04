@@ -154,7 +154,7 @@ class Main extends PluginBase implements Listener
 			}
 			if(!isset($args[1]))
 			{
-				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 使用方法: /res create <名称>');
 				break;
 			}
 			if(strlen($args[1])<=0 || strlen($args[1])>=60)
@@ -211,7 +211,7 @@ class Main extends PluginBase implements Listener
 		case 'remove':
 			if(!isset($args[1]))
 			{
-				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 使用方法: /res remove <名称>');
 				break;
 			}
 			if($args[1]=='spawn' && $sender instanceof Player)
@@ -242,7 +242,7 @@ class Main extends PluginBase implements Listener
 		case 'give':
 			if(!isset($args[2]) || $args[2]=='')
 			{
-				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 使用方法: /res give <领地> <玩家>');
 				break;
 			}
 			if($args[1]=='spawn' && $sender instanceof Player)
@@ -289,7 +289,7 @@ class Main extends PluginBase implements Listener
 				}
 				else
 				{
-					$sender->sendMessage('====FResidence 领地查询结果===='.self::$NL.'领地名 :'.$res->getName().self::$NL.'拥有者 :'.$res->getOwner().self::$NL.'大小 : '.$res->getSize().' 方块'.self::$NL.'所在世界 : '.$res->getLevel());
+					$sender->sendMessage('====FResidence 领地查询结果===='.self::$NL.'领地名 :'.$res->getName().self::$NL.'拥有者 :'.$res->getOwner().self::$NL.'大小 : '.$res->getSize().' 方块'.self::$NL.'所在世界 : '.$res->getLevel().self::$NL.TextFormat::GOLD.'[FResidence] 也可使用 /res info <领地> 来查询指定领地');
 				}
 				break;
 			}
@@ -306,7 +306,7 @@ class Main extends PluginBase implements Listener
 			}
 			else
 			{
-				$sender->sendMessage('====FResidence 领地查询结果===='.self::$NL.'领地名 :'.$res->getName().self::$NL.'拥有者 :'.$res->getOwner().self::$NL.'大小 : '.$res->getSize().' 方块'.' 方块'.self::$NL.'所在世界 : '.$res->getLevel());
+				$sender->sendMessage('====FResidence 领地查询结果===='.self::$NL.'领地名 :'.$res->getName().self::$NL.'拥有者 :'.$res->getOwner().self::$NL.'大小 : '.$res->getSize().' 方块'.self::$NL.'所在世界 : '.$res->getLevel());
 			}
 			break;
 		case 'list':
@@ -364,7 +364,7 @@ class Main extends PluginBase implements Listener
 			{
 				if($page*5<=$key && ($page+1)*5>$key)
 				{
-					$help.=TextFormat::YELLOW.$res->getName().' - 大小 '.$res->getSize().' 方块'.self::$NL;
+					$help.=TextFormat::YELLOW.$res->getName().' - 大小 '.$res->getSize().' 方块 ,所在世界 : '.$res->getLevel().self::$NL;
 				}
 				unset($res,$key);
 			}
@@ -411,7 +411,7 @@ class Main extends PluginBase implements Listener
 			{
 				if($page*5<=$key && ($page+1)*5>$key)
 				{
-					$help.=TextFormat::YELLOW.$res->getName().' - 大小 '.$res->getSize().' 方块'.self::$NL;
+					$help.=TextFormat::YELLOW.$res->getName().' - 大小 '.$res->getSize().' 方块 ,所在世界 : '.$res->getLevel().self::$NL;
 				}
 				unset($res,$key);
 			}
@@ -420,7 +420,7 @@ class Main extends PluginBase implements Listener
 		case 'message':
 			if(!isset($args[2]))
 			{
-				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 使用方法: /res message <领地> <索引> <信息> 消息索引如下'.self::$NL.'enter - 进入消息'.self::$NL.'leave - 离开消息'.self::$NL.'permission - 提示没有权限的消息');
 				break;
 			}
 			if($args[1]=='spawn' && $sender instanceof Player)
@@ -431,7 +431,7 @@ class Main extends PluginBase implements Listener
 			$args[2]=strtolower($args[2]);
 			if($args[2]!='enter' && $args[2]!='leave' && $args[2]!='permission')
 			{
-				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的消息索引 ,只能为以下值的任意一个 :/nenter - 进入消息/nleave - 离开消息/npermission - 没有权限消息');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 错误的消息索引 ,只能为以下值的任意一个 :'.self::$NL.'enter - 进入消息'.self::$NL.'leave - 离开消息'.self::$NL.'permission - 提示没有权限的消息');
 				break;
 			}
 			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
@@ -451,7 +451,7 @@ class Main extends PluginBase implements Listener
 		case 'default':
 			if(!isset($args[1]))
 			{
-				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 使用方法 :/res default <领地>');
 				break;
 			}
 			if($args[1]=='spawn' && $sender instanceof Player)
@@ -476,7 +476,14 @@ class Main extends PluginBase implements Listener
 		case 'set':
 			if(!isset($args[3]))
 			{
-				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 使用方法: /res set <领地> <权限索引> <true/false> 权限索引见下表'.self::$NL.
+					'move - 玩家移动权限'.self::$NL.
+					'build - 破坏/放置权限'.self::$NL.
+					'use - 使用工作台/箱子等权限'.self::$NL.
+					'pvp - PVP权限'.self::$NL.
+					'damage - 是否能受到伤害'.self::$NL.
+					'tp - 传送到此领地的权限'.self::$NL.
+					'flow - 液体流动权限');
 				break;
 			}
 			if($args[1]=='spawn' && $sender instanceof Player)
@@ -520,7 +527,12 @@ class Main extends PluginBase implements Listener
 		case 'pset':
 			if(!isset($args[4]))
 			{
-				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 使用方法: /res pset <领地> <玩家> <权限索引> <true/false> 权限索引见下表'.self::$NL.
+					'move - 玩家移动权限'.self::$NL.
+					'build - 破坏/放置权限'.self::$NL.
+					'use - 使用工作台/箱子等权限'.self::$NL.
+					'pvp - PVP权限'.self::$NL.
+					'tp - 传送到此领地的权限');
 				break;
 			}
 			if($args[1]=='spawn' && $sender instanceof Player)
@@ -568,7 +580,7 @@ class Main extends PluginBase implements Listener
 		case 'tp':
 			if(!isset($args[1]))
 			{
-				$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 使用方法: /res tp <领地>');
 				break;
 			}
 			if(!$sender instanceof Player)
@@ -649,7 +661,7 @@ class Main extends PluginBase implements Listener
 			$sender->sendMessage($help);
 			break;
 		default:
-			$sender->sendMessage(TextFormat::RED.'[FResidence] 使用 /res help 查看帮助');
+			$sender->sendMessage(TextFormat::RED.'[FResidence] 请使用 /res help 查看帮助');
 			break;
 		}
 		unset($sender,$command,$label,$help,$rid,$res,$resarr,$break,$select1,$select2,$level,$args);
