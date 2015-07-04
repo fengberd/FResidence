@@ -289,7 +289,7 @@ class Main extends PluginBase implements Listener
 				}
 				else
 				{
-					$sender->sendMessage('====FResidence 领地查询结果===='.self::$NL.'领地名 :'.$res->getName().self::$NL.'拥有者 :'.$res->getOwner().self::$NL.'大小 : '.$res->getSize().' 方块');
+					$sender->sendMessage('====FResidence 领地查询结果===='.self::$NL.'领地名 :'.$res->getName().self::$NL.'拥有者 :'.$res->getOwner().self::$NL.'大小 : '.$res->getSize().' 方块'.self::$NL.'所在世界 : '.$res->getLevel());
 				}
 				break;
 			}
@@ -306,7 +306,7 @@ class Main extends PluginBase implements Listener
 			}
 			else
 			{
-				$sender->sendMessage('====FResidence 领地查询结果===='.self::$NL.'领地名 :'.$res->getName().self::$NL.'拥有者 :'.$res->getOwner().self::$NL.'大小 : '.$res->getSize().' 方块');
+				$sender->sendMessage('====FResidence 领地查询结果===='.self::$NL.'领地名 :'.$res->getName().self::$NL.'拥有者 :'.$res->getOwner().self::$NL.'大小 : '.$res->getSize().' 方块'.' 方块'.self::$NL.'所在世界 : '.$res->getLevel());
 			}
 			break;
 		case 'list':
