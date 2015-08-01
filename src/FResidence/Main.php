@@ -101,7 +101,23 @@ class Main extends PluginBase implements Listener
 			break;
 		}
 		Item::addCreativeItem(Item::get($this->landItem,0));
-		$this->getServer()->getPluginManager()->registerEvents($this,$this);
+		
+		$reflection=new \ReflectionClass(\get_class($this));
+		foreach($reflection->getMethods() as $method)
+		{
+			if(!$method->isStatic())
+			{
+				$priority=0;
+				$parameters=$method->getParameters();
+				if(\count($parameters)===1 and $parameters[0]->getClass() instanceof \ReflectionClass and \is_subclass_of($parameters[0]->getClass()->getName(),\pocketmine\event\Event::class))
+				{
+					$class=$parameters[0]->getClass()->getName();
+					$reflection=new \ReflectionClass($class);
+					$this->getServer()->getPluginManager()->registerEvent($class,$this,$priority,new \pocketmine\plugin\MethodEventExecutor($method->getName()),$this,false);
+				}
+			}
+			unset($method);
+		}
 	}
 	
 	public function onCommand(CommandSender $sender, Command $command, $label, array $args)
