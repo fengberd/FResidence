@@ -61,13 +61,15 @@ class Main extends PluginBase implements Listener
 			'landItem',
 			'blockMoney',
 			'moneyName',
-			'checkMoveTick');
+			'checkMoveTick',
+			'playerMaxCount');
 		$defaults=array(
 			'yaml',
 			Item::WOODEN_HOE,
 			0.05,
 			'节操',
-			10);
+			10,
+			3);
 		foreach($names as $key=>$_name)
 		{
 			if(!$this->config->exists($_name))
@@ -79,6 +81,7 @@ class Main extends PluginBase implements Listener
 		$this->blockMoney=$this->config->get('blockMoney')*1;
 		$this->moneyName=$this->config->get('moneyName');
 		$this->checkMoveTick=(int)$this->config->get('checkMoveTick');
+		$this->playerMaxCount=(int)$this->config->get('playerMaxCount');
 		$this->config->save();
 	}
 	
@@ -179,6 +182,11 @@ class Main extends PluginBase implements Listener
 			if(strlen($args[1])<=0 || strlen($args[1])>=60)
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 无效领地名称');
+				break;
+			}
+			if(count($this->provider->queryResidencesByOwner($sender->getName()))>=$this->playerMaxCount)
+			{
+				$sender->sendMessage(TextFormat::RED.'[FResidence] 你拥有的的领地数量已经达到了上限 '.$this->playerMaxCount.' 块');
 				break;
 			}
 			$rid=$this->provider->queryResidenceByName($args[1]);
@@ -721,6 +729,11 @@ class Main extends PluginBase implements Listener
 	{
 		$name=$event->getPlayer()->getName();
 		$this->select[$name]->checkMoveTick--;
+		$this->select[$name]->move[]=$event->getFrom();
+		if(count($this->select[$name]->move)>$this->select[$name]->checkMoveTick)
+		{
+			array_shift($this->select[$name]->move);
+		}
 		if($this->select[$name]->checkMoveTick>0)
 		{
 			unset($name,$event);
@@ -730,7 +743,7 @@ class Main extends PluginBase implements Listener
 		$res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getTo()));
 		if($res!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$event->getPlayer()->isOp() && !$res->getPlayerPermission($event->getPlayer()->getName(),'move'))
 		{
-			$event->setCancelled();
+			$event->getPlayer()->teleport($this->select[$name]->move[0]);
 			$event->getPlayer()->sendPopup($res->getMessage('permission'));
 		}
 		else if($res===false && $this->select[$name]->nowland!==false)

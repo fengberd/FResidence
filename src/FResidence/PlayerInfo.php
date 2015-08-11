@@ -8,6 +8,7 @@ class PlayerInfo
 	public $player=false;
 	public $nowland=false;
 	public $checkMoveTick=10;
+	public $move=array();
 	
 	public function __construct($player)
 	{
