@@ -184,7 +184,7 @@ class Main extends PluginBase implements Listener
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 无效领地名称');
 				break;
 			}
-			if(count($this->provider->queryResidencesByOwner($sender->getName()))>=$this->playerMaxCount)
+			if(!$sender->isOp() && count($this->provider->queryResidencesByOwner($sender->getName()))>=$this->playerMaxCount)
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 你拥有的的领地数量已经达到了上限 '.$this->playerMaxCount.' 块');
 				break;
