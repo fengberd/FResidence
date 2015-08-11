@@ -60,12 +60,14 @@ class Main extends PluginBase implements Listener
 			'Provider',
 			'landItem',
 			'blockMoney',
-			'moneyName');
+			'moneyName',
+			'checkMoveTick');
 		$defaults=array(
 			'yaml',
 			Item::WOODEN_HOE,
 			0.05,
-			'节操');
+			'节操',
+			10);
 		foreach($names as $key=>$_name)
 		{
 			if(!$this->config->exists($_name))
@@ -76,6 +78,7 @@ class Main extends PluginBase implements Listener
 		$this->landItem=(int)$this->config->get('landItem');
 		$this->blockMoney=$this->config->get('blockMoney')*1;
 		$this->moneyName=$this->config->get('moneyName');
+		$this->checkMoveTick=(int)$this->config->get('checkMoveTick');
 		$this->config->save();
 	}
 	
@@ -716,27 +719,35 @@ class Main extends PluginBase implements Listener
 	 */
 	public function onPlayerMove(PlayerMoveEvent $event)
 	{
+		$name=$event->getPlayer()->getName();
+		$this->select[$name]->checkMoveTick--;
+		if($this->select[$name]->checkMoveTick>0)
+		{
+			unset($name,$event);
+			return;
+		}
+		$this->select[$name]->checkMoveTick=$this->checkMoveTick;
 		$res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getTo()));
 		if($res!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$event->getPlayer()->isOp() && !$res->getPlayerPermission($event->getPlayer()->getName(),'move'))
 		{
 			$event->setCancelled();
 			$event->getPlayer()->sendPopup($res->getMessage('permission'));
 		}
-		else if($res===false && $this->select[$event->getPlayer()->getName()]->nowland!==false)
+		else if($res===false && $this->select[$name]->nowland!==false)
 		{
-			$res=$this->provider->getResidence($this->provider->queryResidenceByName($this->select[$event->getPlayer()->getName()]->nowland));
+			$res=$this->provider->getResidence($this->provider->queryResidenceByName($this->select[$name]->nowland));
 			if($res!==false)
 			{
-				$this->select[$event->getPlayer()->getName()]->nowland=false;
+				$this->select[$name]->nowland=false;
 				$msg=$res->getMessage('leave');
 				$msg=str_replace('%name',$res->getName(),$msg);
 				$msg=str_replace('%owner',$res->getOwner(),$msg);
 				$event->getPlayer()->sendMessage($msg);
 			}
 		}
-		else if($res!==false && $this->select[$event->getPlayer()->getName()]->nowland!==$res->getName())
+		else if($res!==false && $this->select[$name]->nowland!==$res->getName())
 		{
-			$this->select[$event->getPlayer()->getName()]->nowland=$res->getName();
+			$this->select[$name]->nowland=$res->getName();
 			$msg=$res->getMessage('enter');
 			$msg=str_replace('%name',$res->getName(),$msg);
 			$msg=str_replace('%owner',$res->getOwner(),$msg);
