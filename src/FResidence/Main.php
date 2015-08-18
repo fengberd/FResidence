@@ -46,6 +46,12 @@ class Main extends PluginBase implements Listener
 		'damage',
 		'tp',
 		'flow');
+	public $provider=null;
+	
+	public function getProvider()
+	{
+		return $this->provider;
+	}
 	
 	public static function getInstance()
 	{
