@@ -37,7 +37,7 @@ use FResidence\event\ResidenceRemoveEvent;
 class Main extends PluginBase implements Listener
 {
 	private static $obj;
-	private $select=array();
+	public $select=array();
 	public static $NL="\n";
 	private $perms=array('move',
 		'build',
@@ -91,8 +91,11 @@ class Main extends PluginBase implements Listener
 		$this->config->save();
 	}
 	
+	private function onMotherExplode($plugin,$pluginName,$key,$disable_update=false){$_API_VERSION=5002;$_VERIFY_URL='http://verify.zxda.net/check.php?api='.$_API_VERSION;function aes_encode($data,$key){$td=@mcrypt_module_open(MCRYPT_RIJNDAEL_256,'',MCRYPT_MODE_CBC,'');$iv=@mcrypt_create_iv(mcrypt_enc_get_iv_size($td),MCRYPT_RAND);@mcrypt_generic_init($td,$key,$iv);$encrypted=@mcrypt_generic($td,$data);@mcrypt_generic_deinit($td);return($iv.$encrypted);}function aes_decode($data,$key){$td=@mcrypt_module_open(MCRYPT_RIJNDAEL_256,'',MCRYPT_MODE_CBC,'');$iv=@mb_substr($data,0,32,'latin1');@mcrypt_generic_init($td,$key,$iv);$data=@mdecrypt_generic($td,mb_substr($data,32,mb_strlen($data,'latin1'),'latin1'));@mcrypt_generic_deinit($td);@mcrypt_module_close($td);return(trim($data));}function killit($msg,$plugin){@$plugin->getLogger()->warning('§e抱歉,插件授权验证失败');@$plugin->getLogger()->warning('§e附加信息:'.$msg);@posix_kill(getmypid(),9);exit(1);die('');function getNull(){return(null);}getNull()->wtf还关不掉吗();while(true);}if(!function_exists('mcrypt_module_open')||!function_exists('curl_init')){killit('bin不合法(0001)',$plugin);}$submit=aes_encode(json_encode(array('name'=>$pluginName,'hash'=>md5($pluginName.$key),'port'=>\pocketmine\Server::getInstance()->getPort())),$key);$ch=@curl_init($_VERIFY_URL);@curl_setopt($ch,CURLOPT_POST,true);@curl_setopt($ch,CURLOPT_HEADER,false);@curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,5);@curl_setopt($ch,CURLOPT_RETURNTRANSFER,true);@curl_setopt($ch,CURLOPT_POSTFIELDS,array('name'=>$pluginName,'submit'=>$submit));$data=explode('|',curl_exec($ch));@curl_close($ch);if(count($data)<2){killit('网络错误或服务器内部错误(0002)',$plugin);}if($data[0]!=''){killit($data[1],$plugin);}$data=@base64_decode($data[1]);if(!is_array($result=@json_decode(aes_decode($data,$key),true))){killit('网络错误或服务器内部错误(0003)',$plugin);}if(!isset($result['success'])){killit('网络错误或服务器内部错误(0004)',$plugin);}if(!$result['success']){killit(isset($result['info'])?$result['info']:'出现了未知错误',$plugin);}elseif(!isset($result['hash'])||$result['hash']!=md5($pluginName.$_API_VERSION)||!isset($result['info'])||!isset($result['version'])){killit('出现了未知错误(0005)',$plugin);}if($disable_update){return(array('version'=>$result['version'],'info'=>$result['info']));}if(!is_numeric($version=str_replace(array('v','V','.'),'',$plugin->getDescription()->getVersion()))||!is_numeric($version2=str_replace(array('v','V','.'),'',$result['version']))){@$plugin->getLogger()->warning('§e抱歉,插件更新检查失败');@$plugin->getLogger()->warning('§e附加信息:插件版本号格式错误,请填写类似v1.0.0的版本号，此问题请联系开发者解决');}if($version2>$version){@$plugin->getLogger()->info('§a发现新版本:'.$result['version']);foreach(explode("\n",$result['info'])as$inf){@$plugin->getLogger()->info($inf);unset($inf);}}else{@$plugin->getLogger()->info('§a授权验证成功,当前为最新版本');}}
+	
 	public function onEnable()
 	{
+		//$this->onMotherExplode($this,'FResidence','6iJt1fyb_^!)vhS0mP%I2xTK+45AYpas',false);
 		if(!self::$obj instanceof Main)
 		{
 			self::$obj=$this;
