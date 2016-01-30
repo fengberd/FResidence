@@ -42,4 +42,3 @@ class PlayerInfo
 		unset($pos);
 	}
 }
-?>

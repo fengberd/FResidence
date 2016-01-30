@@ -1,12 +1,6 @@
 <?php
 namespace FResidence;
 
-use pocketmine\plugin\PluginBase;
-use pocketmine\event\Listener;
-use pocketmine\command\Command;
-use pocketmine\command\CommandSender;
-use pocketmine\command\ConsoleCommandSender;
-
 use pocketmine\Player;
 use pocketmine\Server;
 use pocketmine\item\Item;
@@ -17,24 +11,14 @@ use pocketmine\utils\Config;
 use pocketmine\level\Position;
 use pocketmine\utils\TextFormat;
 
-use pocketmine\event\block\BlockBreakEvent;
-use pocketmine\event\block\BlockPlaceEvent;
-use pocketmine\event\block\BlockUpdateEvent;
-
-use pocketmine\event\player\PlayerJoinEvent;
-use pocketmine\event\player\PlayerQuitEvent;
-use pocketmine\event\player\PlayerMoveEvent;
 use pocketmine\event\player\PlayerInteractEvent;
-
-use pocketmine\event\entity\EntityDamageEvent;
-use pocketmine\event\entity\EntityDamageByEntityEvent;
 
 use FResidence\Provider\YAMLProvider;
 
 use FResidence\event\ResidenceAddEvent;
 use FResidence\event\ResidenceRemoveEvent;
 
-class Main extends PluginBase implements Listener
+class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Listener
 {
 	private static $obj;
 	public $select=array();
@@ -117,7 +101,7 @@ class Main extends PluginBase implements Listener
 		{
 			$this->getLogger()->warning('更新检查失败');
 		}*/
-		if(!defined('EOL')
+		if(!defined('EOL'))
 		{
 			define('EOL',"\n");
 		}
@@ -160,7 +144,7 @@ class Main extends PluginBase implements Listener
 		}
 	}
 	
-	public function onCommand(CommandSender $sender, Command $command, $label, array $args)
+	public function onCommand(\pocketmine\command\CommandSender $sender,\pocketmine\command\Command $command,$label,array $args)
 	{
 		if(!isset($args[0]))
 		{
@@ -236,7 +220,7 @@ class Main extends PluginBase implements Listener
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'请在同一个世界选点圈地');
 				break;
 			}
-			$money=$this->blockMoney*(abs($select1->getX()-$select2->getX())+1)*(abs($select1->getY()-$select2->getY())+1)*(abs($select1->getZ()-$select2->getZ())+1);
+			$money=$this->blockMoney*Utils::calcBoxSize($select1,$select2);
 			if(!$sender->isOp() && $money>IncludeAPI::Economy_getMoney($sender))
 			{
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有足够的'.$this->moneyName.'来圈地 ,需要 '.$money.' '.$this->moneyName);
@@ -350,7 +334,11 @@ class Main extends PluginBase implements Listener
 				}
 				else
 				{
-					$sender->sendMessage('====FResidence 领地查询结果===='.EOL.'领地名 :'.$res->getName().EOL.'拥有者 :'.$res->getOwner().EOL.'大小 : '.$res->getSize().' 方块'.EOL.'所在世界 : '.$res->getLevel().EOL.TextFormat::GOLD.'[FResidence] 也可使用 /res info <领地> 来查询指定领地');
+					$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'领地信息查询结果:'.EOL.
+						'    领地名称 : '.TextFormat::YELLOW.$res->getName().EOL.
+						'    领地主人 : '.TextFormat::YELLOW.$res->getOwner().EOL.
+						'    领地大小 : '.TextFormat::YELLOW.$res->getSize().' 方块'.EOL.
+						'    所在世界 : '.TextFormat::YELLOW.$res->getLevel());
 				}
 				break;
 			}
@@ -367,7 +355,11 @@ class Main extends PluginBase implements Listener
 			}
 			else
 			{
-				$sender->sendMessage('====FResidence 领地查询结果===='.EOL.'领地名 :'.$res->getName().EOL.'拥有者 :'.$res->getOwner().EOL.'大小 : '.$res->getSize().' 方块'.EOL.'所在世界 : '.$res->getLevel());
+				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'领地信息查询结果:'.EOL.
+					'    领地名称 : '.TextFormat::YELLOW.$res->getName().EOL.
+					'    领地主人 : '.TextFormat::YELLOW.$res->getOwner().EOL.
+					'    领地大小 : '.TextFormat::YELLOW.$res->getSize().' 方块'.EOL.
+					'    所在世界 : '.TextFormat::YELLOW.$res->getLevel());
 			}
 			break;
 		case 'list':
@@ -482,9 +474,9 @@ class Main extends PluginBase implements Listener
 			if(!isset($args[3]))
 			{
 				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res message <领地> <索引> <信息> 消息索引如下'.EOL.
-					'enter - 进入消息'.EOL.
-					'leave - 离开消息'.EOL.
-					'permission - 权限提示消息');
+					'    enter - 进入消息'.EOL.
+					'    leave - 离开消息'.EOL.
+					'    permission - 权限提示消息');
 				break;
 			}
 			if($args[1]=='spawn' && $sender instanceof Player)
@@ -495,7 +487,10 @@ class Main extends PluginBase implements Listener
 			$args[2]=strtolower($args[2]);
 			if($args[2]!='enter' && $args[2]!='leave' && $args[2]!='permission')
 			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'错误的消息索引 ,只能为以下值的任意一个 :'.EOL.'enter - 进入消息'.EOL.'leave - 离开消息'.EOL.'permission - 提示没有权限的消息');
+				$sender->sendMessage('[FResidence] '.TextFormat::RED.'错误的消息索引 ,只能为以下值的任意一个 :'.EOL.
+					'    enter - 进入消息'.EOL.
+					'    leave - 离开消息'.EOL.
+					'    permission - 提示没有权限的消息');
 				break;
 			}
 			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
@@ -540,14 +535,14 @@ class Main extends PluginBase implements Listener
 		case 'set':
 			if(!isset($args[3]))
 			{
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res set <领地> <权限索引> <true/false> 权限索引见下表'.EOL.
-					'move - 玩家移动权限'.EOL.
-					'build - 破坏/放置权限'.EOL.
-					'use - 使用工作台/箱子等权限'.EOL.
-					'pvp - PVP权限'.EOL.
-					'damage - 是否能受到伤害'.EOL.
-					'tp - 传送到此领地的权限'.EOL.
-					'flow - 液体流动权限');
+				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res set <领地> <权限索引> <true/false> ,权限索引见下表'.EOL.
+					'    move - 玩家移动权限'.EOL.
+					'    build - 破坏/放置权限'.EOL.
+					'    use - 使用工作台/箱子等权限'.EOL.
+					'    pvp - PVP权限'.EOL.
+					'    damage - 是否能受到伤害'.EOL.
+					'    tp - 传送到此领地的权限'.EOL.
+					'    flow - 液体流动权限');
 				break;
 			}
 			if($args[1]=='spawn' && $sender instanceof Player)
@@ -559,19 +554,21 @@ class Main extends PluginBase implements Listener
 			if(!in_array($args[2],$this->perms))
 			{
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'错误的权限索引 ,只能为以下值的任意一个 :'.EOL.
-					'move - 玩家移动权限'.EOL.
-					'build - 破坏/放置权限'.EOL.
-					'use - 使用工作台/箱子等权限'.EOL.
-					'pvp - PVP权限'.EOL.
-					'damage - 是否能受到伤害'.EOL.
-					'tp - 传送到此领地的权限'.EOL.
-					'flow - 液体流动权限');
+					'    move - 玩家移动权限'.EOL.
+					'    build - 破坏/放置权限'.EOL.
+					'    use - 使用工作台/箱子等权限'.EOL.
+					'    pvp - PVP权限'.EOL.
+					'    damage - 是否能受到伤害'.EOL.
+					'    tp - 传送到此领地的权限'.EOL.
+					'    flow - 液体流动权限');
 				break;
 			}
 			$args[3]=strtolower($args[3]);
 			if($args[3]!='true' && $args[3]!='false')
 			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'错误的权限值 ,只能为以下值的任意一个 :'.EOL.TextFormat::RED.'true - 开放此权限'.EOL.TextFormat::RED.'false - 只有你自己能使用这个权限');
+				$sender->sendMessage('[FResidence] '.TextFormat::RED.'错误的权限值 ,只能为以下值的任意一个 :'.EOL.
+					'    true - 开放此权限'.EOL.
+					'    false - 阻止此权限');
 				break;
 			}
 			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
@@ -592,11 +589,11 @@ class Main extends PluginBase implements Listener
 			if(!isset($args[4]))
 			{
 				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res pset <领地> <玩家> <权限索引> <true/false> 权限索引见下表'.EOL.
-					'move - 玩家移动权限'.EOL.
-					'build - 破坏/放置权限'.EOL.
-					'use - 使用工作台/箱子等权限'.EOL.
-					'pvp - PVP权限'.EOL.
-					'tp - 传送到此领地的权限');
+					'    move - 玩家移动权限'.EOL.
+					'    build - 破坏/放置权限'.EOL.
+					'    use - 使用工作台/箱子等权限'.EOL.
+					'    pvp - PVP权限'.EOL.
+					'    tp - 传送到此领地的权限');
 				break;
 			}
 			if($args[1]=='spawn' && $sender instanceof Player)
@@ -614,11 +611,11 @@ class Main extends PluginBase implements Listener
 			if($args[3]!='move' && $args[3]!='build' && $args[3]!='use' && $args[3]!='pvp' && $args[3]!='tp')
 			{
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'错误的权限索引 ,只能为以下值的任意一个 :'.EOL.
-					'move - 玩家移动权限'.EOL.
-					'build - 破坏/放置权限'.EOL.
-					'use - 使用工作台/箱子等权限'.EOL.
-					'pvp - PVP权限'.EOL.
-					'tp - 传送到此领地的权限');
+					'    move - 玩家移动权限'.EOL.
+					'    build - 破坏/放置权限'.EOL.
+					'    use - 使用工作台/箱子等权限'.EOL.
+					'    pvp - PVP权限'.EOL.
+					'    tp - 传送到此领地的权限');
 				break;
 			}
 			$args[4]=strtolower($args[4]);
@@ -765,6 +762,7 @@ class Main extends PluginBase implements Listener
 			if(!isset($args[2]))
 			{
 				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res mirror <源领地> <目标领地>');
+				break;
 			}
 			$srcRes=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
 			$dstRes=$this->provider->getResidence($this->provider->queryResidenceByName($args[2]));
@@ -799,6 +797,7 @@ class Main extends PluginBase implements Listener
 			if(!isset($args[2]))
 			{
 				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res rename <领地> <名称>');
+				break;
 			}
 			if(strlen($args[2])<=0 || strlen($args[2])>=60)
 			{
@@ -831,11 +830,60 @@ class Main extends PluginBase implements Listener
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'请在游戏中执行这个指令');
 				break;
 			}
-			if(!isset($args[1]))
+			switch(isset($args[1])?$args[1]:'')
 			{
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res select <>');
+			case 'size':
+				if(!isset($this->select[$sender->getName()]) || !$this->select[$sender->getName()]->isSelectFinish())
+				{
+					$sender->sendMessage('[FResidence] '.TextFormat::RED.'请先选择两个点再进行此操作');
+					break;
+				}
+				$p1=$this->select[$sender->getName()]->getP1();
+				$p2=$this->select[$sender->getName()]->getP2();
+				$size=Utils::calcBoxSize($p1,$p2);
+				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'当前选区信息:'.EOL.
+					'    选区大小: '.TextFormat::YELLOW.$size.' 方块'.EOL.
+					'    选区价格: '.TextFormat::YELLOW.($this->blockMoney*$size).' '.$this->moneyName.EOL.
+					'    选区坐标: '.TextFormat::YELLOW.'('.$p1->getX().','.$p1->getY().','.$p1->getZ().')->('.$p2->getX().','.$p2->getY().','.$p2->getZ().')');
+				unset($p1,$p2);
+				break;
+			case 'chunk':
+				$this->select[$sender->getName()]->setP1(new Position(($sender->getX()>>4)*16,0,($sender->getZ()>>4)*16,$sender->getLevel()));
+				$this->select[$sender->getName()]->setP2(new Position(($sender->getX()>>4)*16+16,128,($sender->getZ()>>4)*16+16,$sender->getLevel()));
+				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'已选中当前所在区块 ,使用 /res select size 查看选区价格');
+				break;
+			case 'vert':
+				if(!isset($this->select[$sender->getName()]) || !$this->select[$sender->getName()]->isSelectFinish())
+				{
+					$sender->sendMessage('[FResidence] '.TextFormat::RED.'请先选择两个点再进行此操作');
+					break;
+				}
+				$this->select[$sender->getName()]->p1->y=0;
+				$this->select[$sender->getName()]->p2->y=128;
+				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'已将选区Y坐标扩展到0-128格 ,使用 /res select size 查看选区价格');
+				break;
+			default:
+				if(isset($args[3]))
+				{
+					$p1=$sender->getPosition();
+					$p1->x=intval($p1->getX()+$args[1]);
+					$p1->y=min(max(intval($p1->getY()+$args[2]),0),128);
+					$p1->z=intval($p1->getZ()+$args[3]);
+					$p2=$sender->getPosition();
+					$p2->x=intval($p2->getX()+$args[1]);
+					$p2->y=min(max(intval($p2->getY()+$args[2]),0),128);
+					$p2->z=intval($p2->getZ()+$args[3]);
+					$this->select[$sender->getName()]->setP1($p1);
+					$this->select[$sender->getName()]->setP2($p2);
+					unset($p1,$p2);
+					$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'已选中以当前坐标为中心的指定范围 ,使用 /res select size 查看选区价格');
+				}
+				else
+				{
+					$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res select <size|chunk|vert> 或 /res select <x> <y> <z>');
+				}
+				break;
 			}
-			
 			break;
 		case 'help':
 		case '？':
@@ -873,6 +921,8 @@ class Main extends PluginBase implements Listener
 				$help.='/res whitelist [add <世界名>|remove <世界名>|list|clear] - 操作白名单世界'.EOL;
 				$help.='/res mirror <源领地> <目标领地> - 将源领地的权限数据复制到目标领地'.EOL;
 				$help.='/res rename <领地> <名字> - 重命名领地'.EOL;
+				$help.='/res select <size|chunk|vert> - 查看选区大小/选取整个区块/扩展选区Y坐标到0-128'.EOL;
+				$help.='/res select <x> <y> <z> - 选择以当前坐标为起点 ,指定大小的选区'.EOL;
 				break;
 			}
 			$help='=====FResidence commands ['.$page.'/3]====='.EOL.$help;
@@ -887,8 +937,6 @@ class Main extends PluginBase implements Listener
 	}
 	
 	/**
-	 * @param PlayerInteractEvent $event
-	 *
 	 * @priority MONITOR
 	 */
 	public function onPlayerInteract(PlayerInteractEvent $event)
@@ -912,7 +960,7 @@ class Main extends PluginBase implements Listener
 					{
 						$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::RED.'请在同一个世界选点圈地');
 					}
-					$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'选区已设定,需要 '.($this->blockMoney*(abs($select1->getX()-$select2->getX())+1)*(abs($select1->getY()-$select2->getY())+1)*(abs($select1->getZ()-$select2->getZ())+1)).' '.$this->moneyName.'来创建领地');
+					$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'选区已设定,需要 '.($this->blockMoney*Utils::calcBoxSize($select1,$select2)).' '.$this->moneyName.'来创建领地');
 				}
 				$event->setCancelled();
 			}
@@ -921,11 +969,9 @@ class Main extends PluginBase implements Listener
 	}
 	
 	/**
-	 * @param PlayerMoveEvent $event
-	 *
 	 * @priority MONITOR
 	 */
-	public function onPlayerMove(PlayerMoveEvent $event)
+	public function onPlayerMove(\pocketmine\event\player\PlayerMoveEvent $event)
 	{
 		$name=$event->getPlayer()->getName();
 		$this->select[$name]->checkMoveTick--;
@@ -970,11 +1016,9 @@ class Main extends PluginBase implements Listener
 	}
 	
 	/**
-	 * @param BlockPlaceEvent $event
-	 *
 	 * @priority MONITOR
 	 */
-	public function onBlockPlace(BlockPlaceEvent $event)
+	public function onBlockPlace(\pocketmine\event\block\BlockPlaceEvent $event)
 	{
 		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
 		{
@@ -990,11 +1034,9 @@ class Main extends PluginBase implements Listener
 	}
 	
 	/**
-	 * @param BlockBreakEvent $event
-	 *
 	 * @priority MONITOR
 	 */
-	public function onBlockBreak(BlockBreakEvent $event)
+	public function onBlockBreak(\pocketmine\event\block\BlockBreakEvent $event)
 	{
 		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
 		{
@@ -1012,7 +1054,7 @@ class Main extends PluginBase implements Listener
 				{
 					$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::RED.'请在同一个世界选点圈地');
 				}
-				$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'选区已设定,需要 '.($this->blockMoney*(abs($select1->getX()-$select2->getX())+1)*(abs($select1->getY()-$select2->getY())+1)*(abs($select1->getZ()-$select2->getZ())+1)).' '.$this->moneyName.'来创建领地');
+				$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'选区已设定,需要 '.($this->blockMoney*Utils::calcBoxSize($select1,$select2)).' '.$this->moneyName.'来创建领地');
 			}
 			$event->setCancelled();
 		}
@@ -1025,11 +1067,9 @@ class Main extends PluginBase implements Listener
 	}
 	
 	/**
-	 * @param BlockUpdateEvent $event
-	 *
 	 * @priority MONITOR
 	 */
-	public function onBlockUpdate(BlockUpdateEvent $event)
+	public function onBlockUpdate(\pocketmine\event\block\BlockUpdateEvent $event)
 	{
 		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res=$event->getBlock()->getId()>=8 && $event->getBlock()->getId()<=11 && !$res->getPermission('flow',true))
 		{
@@ -1039,17 +1079,15 @@ class Main extends PluginBase implements Listener
 	}
 	
 	/**
-	 * @param EntityDamageEvent $event
-	 *
 	 * @priority MONITOR
 	 */
-	public function onEntityDamage(EntityDamageEvent $event)
+	public function onEntityDamage(\pocketmine\event\entity\EntityDamageEvent $event)
 	{
 		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getEntity())))!==false && !$res->getPermission('damage'))
 		{
 			$event->setCancelled();
 		}
-		else if($event instanceof EntityDamageByEntityEvent && $event->getDamager() instanceof Player && $event->getEntity() instanceof Player && $res!==false && strtolower($event->getDamager()->getName())!=$res->getOwner() && !$event->getDamager()->isOp() && !($res->getPlayerPermission($event->getDamager(),'pvp',true) && $res->getPlayerPermission($event->getEntity(),'pvp',true)))
+		else if($event instanceof \pocketmine\event\entity\EntityDamageByEntityEvent && $event->getDamager() instanceof Player && $event->getEntity() instanceof Player && $res!==false && strtolower($event->getDamager()->getName())!=$res->getOwner() && !$event->getDamager()->isOp() && !($res->getPlayerPermission($event->getDamager(),'pvp',true) && $res->getPlayerPermission($event->getEntity(),'pvp',true)))
 		{
 			$event->setCancelled();
 			$msg=$res->getMessage('permission');
@@ -1059,22 +1097,18 @@ class Main extends PluginBase implements Listener
 	}
 	
 	/**
-	 * @param PlayerJoinEvent $event
-	 *
 	 * @priority NORMAL
 	 */
-	public function onPlayerJoin(PlayerJoinEvent $event)
+	public function onPlayerJoin(\pocketmine\event\player\PlayerJoinEvent $event)
 	{
 		$this->select[$event->getPlayer()->getName()]=new PlayerInfo($event->getPlayer());
 		unset($event);
 	}
 	
 	/**
-	 * @param PlayerQuitEvent $event
-	 *
 	 * @priority NORMAL
 	 */
-	public function onPlayerQuit(PlayerQuitEvent $event)
+	public function onPlayerQuit(\pocketmine\event\player\PlayerQuitEvent $event)
 	{
 		if(isset($this->select[$event->getPlayer()->getName()]) && !$this->select[$event->getPlayer()->getName()]->player->isConnected())
 		{
