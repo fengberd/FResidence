@@ -83,7 +83,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	
 	public function onEnable()
 	{
-		$this->getLogger()->info(TextFormat::GREEN.'正在检测插件授权...');
+		/*$this->getLogger()->info(TextFormat::GREEN.'正在检测插件授权...');
 		$data=ZXDA::checkHosts();
 		if(!$data['success'])
 		{
@@ -106,7 +106,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		else
 		{
 			$this->getLogger()->warning('更新检查失败');
-		}
+		}*/
 		if(!defined('EOL'))
 		{
 			define('EOL',"\n");
