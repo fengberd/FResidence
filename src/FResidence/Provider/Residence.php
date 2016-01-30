@@ -27,6 +27,7 @@ class Residence
 	{
 		$this->__rid=$ID;
 		$this->provider=$provider;
+		$data['metadata']['permission']=array_merge(self::$DefaultPermission,$data['metadata']['permission']);
 		$this->data=$data;
 	}
 	
@@ -107,6 +108,23 @@ class Residence
 		$this->data['metadata']['permission']=Residence::$DefaultPermission;
 		$this->data['metadata']['playerpermission']=array();
 		$this->save();
+	}
+	
+	public function getAllPermission($default=false)
+	{
+		return isset($this->data['metadata']['permission'])?($this->data['metadata']['permission']):$default;
+	}
+	
+	public function setAllPermission($data)
+	{
+		if(!is_array($data))
+		{
+			return false;
+		}
+		$this->data['metadata']['permission']=$data;
+		$this->save();
+		unset($data);
+		return true;
 	}
 	
 	public function getPermission($index,$default=false)
@@ -205,4 +223,3 @@ class Residence
 		return false;
 	}
 }
-?>

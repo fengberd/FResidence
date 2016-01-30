@@ -24,4 +24,3 @@ interface DataProvider
 	public function close($save);
 	public function reload($save);
 }
-?>

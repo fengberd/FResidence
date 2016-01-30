@@ -11,7 +11,7 @@ use FResidence\Main;
 class YAMLProvider implements DataProvider
 {
 	private $config;
-	private $Residences=array();
+	private $residences=array();
 	private $main;
 	
 	public function __construct(Main $main)
@@ -28,7 +28,7 @@ class YAMLProvider implements DataProvider
 			$owner=$owner->getName();
 		}
 		$owner=strtolower($owner);
-		$this->Residences[]=new Residence($this,count($this->Residences),array(
+		$this->residences[]=new Residence($this,count($this->residences),array(
 			'name'=>$name,
 			'start'=>array(
 				'x'=>(int)$startpos->getX(),
@@ -53,12 +53,12 @@ class YAMLProvider implements DataProvider
 					'z'=>(int)$startpos->getZ()))));
 		$this->save();
 		unset($startpos,$endpos,$owner,$name);
-		return count($this->Residences)-1;
+		return count($this->residences)-1;
 	}
 	
 	public function getAllResidences()
 	{
-		return $this->Residences;
+		return $this->residences;
 	}
 	
 	public function getResidence($resid)
@@ -67,16 +67,16 @@ class YAMLProvider implements DataProvider
 		{
 			return false;
 		}
-		return isset($this->Residences[$resid])?$this->Residences[$resid]:false;
+		return isset($this->residences[$resid])?$this->residences[$resid]:false;
 	}
 	
 	public function removeResidence($resid)
 	{
-		if(!isset($this->Residences[$resid]))
+		if(!isset($this->residences[$resid]))
 		{
 			return false;
 		}
-		unset($this->Residences[$resid],$resid);
+		unset($this->residences[$resid],$resid);
 		$this->save();
 		return true;
 	}
@@ -89,11 +89,11 @@ class YAMLProvider implements DataProvider
 		}
 		$owner=strtolower($owner);
 		$cou=0;
-		foreach($this->Residences as $key=>$res)
+		foreach($this->residences as $key=>$res)
 		{
 			if($res->getOwner()===$owner)
 			{
-				unset($this->Residences[$key]);
+				unset($this->residences[$key]);
 				$cou++;
 			}
 			unset($key,$res);
@@ -105,7 +105,7 @@ class YAMLProvider implements DataProvider
 	
 	public function queryResidenceByName($name)
 	{
-		foreach($this->Residences as $key=>$res)
+		foreach($this->residences as $key=>$res)
 		{
 			if($res->getName()===$name)
 			{
@@ -126,7 +126,7 @@ class YAMLProvider implements DataProvider
 		}
 		$owner=strtolower($owner);
 		$ret=array();
-		foreach($this->Residences as $key=>$res)
+		foreach($this->residences as $key=>$res)
 		{
 			if($res->getOwner()===$owner)
 			{
@@ -144,7 +144,7 @@ class YAMLProvider implements DataProvider
 		{
 			$level=$pos->getLevel()->getFolderName();
 		}
-		foreach($this->Residences as $key=>$res)
+		foreach($this->residences as $key=>$res)
 		{
 			if($res->inResidence($pos,$level))
 			{
@@ -164,7 +164,7 @@ class YAMLProvider implements DataProvider
 	public function save()
 	{
 		$data=array();
-		foreach($this->Residences as $res)
+		foreach($this->residences as $res)
 		{
 			$data[]=$res->getData();
 			unset($res);
@@ -191,13 +191,12 @@ class YAMLProvider implements DataProvider
 		unset($save);
 		@mkdir($this->main->getDataFolder());
 		$this->config=new Config($this->main->getDataFolder().'residence.yml',Config::YAML,array(
-			'dataVersion'=>1,
+			'DataVersion'=>1,
 			'Residences'=>array()));
 		foreach($this->config->get('Residences') as $arr)
 		{
-			$this->Residences[]=new Residence($this,count($this->Residences),$arr);
+			$this->residences[]=new Residence($this,count($this->residences),$arr);
 			unset($arr);
 		}
 	}
 }
-?>
