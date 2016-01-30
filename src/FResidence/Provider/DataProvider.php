@@ -1,5 +1,5 @@
 <?php
-namespace FResidence\Provider;
+namespace FResidence\provider;
 
 use FResidence\Main;
 

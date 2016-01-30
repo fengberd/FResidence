@@ -6,7 +6,7 @@ class PlayerInfo
 	public $p1=false;
 	public $p2=false;
 	public $player=false;
-	public $nowland=false;
+	public $currentResidence=false;
 	public $checkMoveTick=10;
 	public $move=array();
 	

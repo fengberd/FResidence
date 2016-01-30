@@ -1,5 +1,5 @@
 <?php
-namespace FResidence\Provider;
+namespace FResidence\provider;
 
 use FResidence\Main;
 
@@ -18,7 +18,8 @@ class Residence
 		'pvp'=>'true',
 		'damage'=>'true',
 		'tp'=>'false',
-		'flow'=>'true');
+		'flow'=>'true',
+		'healing'=>'false');
 	private $provider;
 	private $__rid=-1;
 	private $data;
@@ -34,6 +35,11 @@ class Residence
 	public function save()
 	{
 		$this->provider->save();
+	}
+	
+	public function getID()
+	{
+		return $this->__rid;
 	}
 	
 	public function getData()

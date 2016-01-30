@@ -1,5 +1,5 @@
 <?php
-namespace FResidence\Provider;
+namespace FResidence\provider;
 
 use pocketmine\Player;
 use pocketmine\math\Vector3;

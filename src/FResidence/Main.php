@@ -12,8 +12,9 @@ use pocketmine\level\Position;
 use pocketmine\utils\TextFormat;
 
 use pocketmine\event\player\PlayerInteractEvent;
+use pocketmine\event\entity\EntityRegainHealthEvent;
 
-use FResidence\Provider\YAMLProvider;
+use FResidence\provider\YAMLProvider;
 
 use FResidence\event\ResidenceAddEvent;
 use FResidence\event\ResidenceRemoveEvent;
@@ -28,7 +29,8 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		'pvp',
 		'damage',
 		'tp',
-		'flow');
+		'flow',
+		'healing');
 	public $provider=null;
 	public $whiteListWorld=array();
 	
@@ -46,45 +48,49 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	{
 		@mkdir($this->getDataFolder());
 		$this->config=new Config($this->getDataFolder().'config.yml',Config::YAML,array());
-		$defaults=array(
-			'Provider'=>'yaml',
-			'landItem'=>Item::WOODEN_HOE,
-			'blockMoney'=>0.05,
-			'moneyName'=>'节操',
-			'checkMoveTick'=>10,
-			'playerMaxCount'=>3,
-			'whiteListWorld'=>array());
-		foreach($defaults as $key=>$val)
+		if($this->config->exists('landItem'))
 		{
-			if(!$this->config->exists($key))
-			{
-				$this->config->set($key,$val);
-			}
+			$this->selectItem=intval($this->config->get('landItem',Item::WOODEN_HOE));
+			$this->moneyPerBlock=$this->config->get('blockMoney',0.05)*1;
+			$this->moneyName=$this->config->get('moneyName','元');
+			$this->checkMoveTick=intval($this->config->get('checkMoveTick',10));
+			$this->playerMaxCount=intval($this->config->get('playerMaxCount',3));
+			$this->config->set('WhiteListWorld',$this->config->get('whiteListWorld',array()));
 		}
-		$this->landItem=(int)$this->config->get('landItem');
-		$this->blockMoney=$this->config->get('blockMoney')*1;
-		$this->moneyName=$this->config->get('moneyName');
-		$this->checkMoveTick=(int)$this->config->get('checkMoveTick');
-		$this->playerMaxCount=(int)$this->config->get('playerMaxCount');
-		foreach((array)$this->config->get('whiteListWorld') as $world)
+		else
+		{
+			$this->selectItem=intval($this->config->get('SelectItem',Item::WOODEN_HOE));
+			$this->moneyPerBlock=$this->config->get('MoneyPerBlock',0.05)*1;
+			$this->moneyName=$this->config->get('MoneyName','元');
+			$this->checkMoveTick=intval($this->config->get('CheckMoveTick',10));
+			$this->playerMaxCount=intval($this->config->get('MaxResidenceCount',3));
+		}
+		foreach((array)$this->config->get('WhiteListWorld',array()) as $world)
 		{
 			$this->whiteListWorld[]=strtolower($world);
 			unset($world);
 		}
-		$this->config->set('whiteListWorld',$this->whiteListWorld);
+		$this->config->setAll(array(
+			'Provider'=>'yaml',
+			'MoneyName'=>$this->moneyName,
+			'SelectItem'=>$this->selectItem,
+			'CheckMoveTick'=>$this->checkMoveTick,
+			'MoneyPerBlock'=>$this->moneyPerBlock,
+			'MaxResidenceCount'=>$this->playerMaxCount,
+			'WhiteListWorld'=>$this->whiteListWorld));
 		$this->config->save();
 	}
 	
 	public function onEnable()
 	{
 		$this->getLogger()->info(TextFormat::GREEN.'正在检测插件授权...');
-		/*$data=ZXDA::checkHosts();
+		$data=ZXDA::checkHosts();
 		if(!$data['success'])
 		{
 			ZXDA::killit($data['message'],$this);
 			return;
 		}
-		ZXDA::check($this,40,'6iJt1fyb_^!)vhS0mP%I2xTK+45AYpas');
+		ZXDA::check($this,40,'MTQ0OTAxMDc0NjM5NjUwMTI2ODUzNDgyNjI5MDg4NTY0MTE4MTE0NDYwNzA4MjE5ODcwMjM0NDcxNDk4NjY1NDI1MjgwNTMwMzkwNjQ3MDY3MjEyODc5NTc0NjMyNzgxNzg0Mzk5NTg1NTQ5OTE0MjEwMTA5NDcxODM3MDU1NTgyNDkxMzU4NjUzMjI4NzQxNDY4MDE0ODEzMjcxMDA4MTIwNTU0ODQzMjIwODA4NDM0NTE1MTgzNDM0NDU1Mzc3ODI0NzI0MTM5NjQyMTcyMjMzMDMxMjc5MDA4MzU5NTcxNDAwMTQ3MTUwNDE1NTIyNjMyOTc2MDU4OTYxNTE2MDExMzk5MjA1NDc3OTUxNzMzMDM1NTQ5ODQ0OTYwMDMxMTQ5NjkzMjAzOTUxODk3MjI1MjI5');
 		$data=ZXDA::getInfo($this,40);
 		if($data['success'])
 		{
@@ -100,7 +106,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		else
 		{
 			$this->getLogger()->warning('更新检查失败');
-		}*/
+		}
 		if(!defined('EOL'))
 		{
 			define('EOL',"\n");
@@ -110,7 +116,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			self::$obj=$this;
 		}
 		$this->loadConfig();
-		switch(strtolower($this->config->get('Provider')))
+		switch(strtolower($this->config->get('Provider','yaml')))
 		{
 		/*case 'mysql':
 			break;
@@ -124,7 +130,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			$this->provider=new YAMLProvider($this);
 			break;
 		}
-		Item::addCreativeItem(Item::get($this->landItem,0));
+		Item::addCreativeItem(Item::get($this->selectItem,0));
 		
 		$reflection=new \ReflectionClass(\get_class($this));
 		foreach($reflection->getMethods() as $method)
@@ -220,7 +226,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'请在同一个世界选点圈地');
 				break;
 			}
-			$money=$this->blockMoney*Utils::calcBoxSize($select1,$select2);
+			$money=$this->moneyPerBlock*Utils::calcBoxSize($select1,$select2);
 			if(!$sender->isOp() && $money>IncludeAPI::Economy_getMoney($sender))
 			{
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有足够的'.$this->moneyName.'来圈地 ,需要 '.$money.' '.$this->moneyName);
@@ -541,6 +547,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					'    use - 使用工作台/箱子等权限'.EOL.
 					'    pvp - PVP权限'.EOL.
 					'    damage - 是否能受到伤害'.EOL.
+					'    healing - 是否自动回血'.EOL.
 					'    tp - 传送到此领地的权限'.EOL.
 					'    flow - 液体流动权限');
 				break;
@@ -559,6 +566,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					'    use - 使用工作台/箱子等权限'.EOL.
 					'    pvp - PVP权限'.EOL.
 					'    damage - 是否能受到伤害'.EOL.
+					'    healing - 是否自动回血'.EOL.
 					'    tp - 传送到此领地的权限'.EOL.
 					'    flow - 液体流动权限');
 				break;
@@ -843,7 +851,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				$size=Utils::calcBoxSize($p1,$p2);
 				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'当前选区信息:'.EOL.
 					'    选区大小: '.TextFormat::YELLOW.$size.' 方块'.EOL.
-					'    选区价格: '.TextFormat::YELLOW.($this->blockMoney*$size).' '.$this->moneyName.EOL.
+					'    选区价格: '.TextFormat::YELLOW.($this->moneyPerBlock*$size).' '.$this->moneyName.EOL.
 					'    选区坐标: '.TextFormat::YELLOW.'('.$p1->getX().','.$p1->getY().','.$p1->getZ().')->('.$p2->getX().','.$p2->getY().','.$p2->getZ().')');
 				unset($p1,$p2);
 				break;
@@ -936,6 +944,22 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		return true;
 	}
 	
+	public function systemTaskCallback($currentTick)
+	{
+		foreach($this->select as $player)
+		{
+			if($player->currentResidence!==false && $player->currentResidence->getPermission('healing'))
+			{
+				$player=$player->player;
+				$ev=new EntityRegainHealthEvent($player,1,EntityRegainHealthEvent::CAUSE_CUSTOM);
+				$player->heal($ev->getAmount(),$ev);
+				unset($ev);
+			}
+			unset($player);
+		}
+		unset($currentTick);
+	}
+	
 	/**
 	 * @priority MONITOR
 	 */
@@ -949,7 +973,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				$event->getPlayer()->sendMessage($msg);
 				$event->setCancelled();
 			}
-			else if($event->getItem()->getId()==$this->landItem)
+			else if($event->getItem()->getId()==$this->selectItem)
 			{
 				$this->select[$event->getPlayer()->getName()]->setP1($event->getBlock());
 				$event->getPlayer()->sendMessage('[FResidence] 已设置第一个点');
@@ -960,7 +984,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					{
 						$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::RED.'请在同一个世界选点圈地');
 					}
-					$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'选区已设定,需要 '.($this->blockMoney*Utils::calcBoxSize($select1,$select2)).' '.$this->moneyName.'来创建领地');
+					$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'选区已设定,需要 '.($this->moneyPerBlock*Utils::calcBoxSize($select1,$select2)).' '.$this->moneyName.'来创建领地');
 				}
 				$event->setCancelled();
 			}
@@ -992,21 +1016,17 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			$event->getPlayer()->teleport($this->select[$name]->move[0]);
 			$event->getPlayer()->sendPopup($res->getMessage('permission'));
 		}
-		else if($res===false && $this->select[$name]->nowland!==false)
+		else if($res===false && $this->select[$name]->currentResidence!==false)
 		{
-			$res=$this->provider->getResidence($this->provider->queryResidenceByName($this->select[$name]->nowland));
-			if($res!==false)
-			{
-				$this->select[$name]->nowland=false;
-				$msg=$res->getMessage('leave');
-				$msg=str_replace('%name',$res->getName(),$msg);
-				$msg=str_replace('%owner',$res->getOwner(),$msg);
-				$event->getPlayer()->sendMessage($msg);
-			}
+			$msg=$this->select[$name]->currentResidence->getMessage('leave');
+			$msg=str_replace('%name',$this->select[$name]->currentResidence->getName(),$msg);
+			$msg=str_replace('%owner',$this->select[$name]->currentResidence->getOwner(),$msg);
+			$event->getPlayer()->sendMessage($msg);
+			$this->select[$name]->currentResidence=false;
 		}
-		else if($res!==false && $this->select[$name]->nowland!==$res->getName())
+		else if($res!==false && $this->select[$name]->currentResidence->getID()!==$res->getID())
 		{
-			$this->select[$name]->nowland=$res->getName();
+			$this->select[$name]->currentResidence=$res;
 			$msg=$res->getMessage('enter');
 			$msg=str_replace('%name',$res->getName(),$msg);
 			$msg=str_replace('%owner',$res->getOwner(),$msg);
@@ -1043,7 +1063,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			$event->getPlayer()->sendMessage($res->getMessage('permission'));
 			$event->setCancelled();
 		}
-		else if($event->getItem()->getId()==$this->landItem)
+		else if($event->getItem()->getId()==$this->selectItem)
 		{
 			$this->select[$event->getPlayer()->getName()]->setP2($event->getBlock());
 			$event->getPlayer()->sendMessage('[FResidence] 已设置第二个点');
@@ -1054,7 +1074,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				{
 					$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::RED.'请在同一个世界选点圈地');
 				}
-				$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'选区已设定,需要 '.($this->blockMoney*Utils::calcBoxSize($select1,$select2)).' '.$this->moneyName.'来创建领地');
+				$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'选区已设定,需要 '.($this->moneyPerBlock*Utils::calcBoxSize($select1,$select2)).' '.$this->moneyName.'来创建领地');
 			}
 			$event->setCancelled();
 		}
@@ -1234,10 +1254,9 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		return false;
 	}
 }
-
 class ZXDA
 {
-	private static $_API_VERSION=5006;
+	private static $_API_VERSION=5009;
 	private static $_VERIFIED=false;
 	private static $_VERIFY_SERVERS=array(
 		'v1.zxda-verify.net',
@@ -1245,6 +1264,7 @@ class ZXDA
 		'v3.zxda-verify.net',
 		'v4.zxda-verify.net',
 		'v5.zxda-verify.net');
+	private static $_UPDATE_SERVER_INDEX=0;
 	
 	public static function checkHosts()
 	{
@@ -1286,73 +1306,84 @@ class ZXDA
 	
 	public static function check($plugin,$pid,$key)
 	{
-		date_default_timezone_set('Asia/Shanghai');
-		self::$_VERIFIED=false;
-		if(!function_exists('curl_init'))
+		try
 		{
-			self::killit('bin不合法(0001)',$plugin);
-		}
-		$submit=self::encrypt(json_encode(array(
-			'id'=>$pid,
-			'hash'=>sha1(base64_encode(md5($pid.$key))),
-			'port'=>\pocketmine\Server::getInstance()->getPort())),$key);
-		for($i=0;$i<4;$i++)
-		{
-			$ch=@curl_init();
-			@curl_setopt($ch,CURLOPT_URL,'http://'.self::$_VERIFY_SERVERS[$i].'/check.php?api='.self::$_API_VERSION);
-			@curl_setopt($ch,CURLOPT_HTTPHEADER,array(
-				'User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:12.0) Gecko/20100101 ZXDA_Verify'));
-			@curl_setopt($ch,CURLOPT_PORT,7655);
-			@curl_setopt($ch,CURLOPT_TIMEOUT,20);
-			@curl_setopt($ch,CURLOPT_POST,true);
-			@curl_setopt($ch,CURLOPT_HEADER,false);
-			@curl_setopt($ch,CURLOPT_AUTOREFERER,true);
-			@curl_setopt($ch,CURLOPT_SSL_VERIFYPEER, false);
-			@curl_setopt($ch,CURLOPT_SSL_VERIFYHOST,2);
-			@curl_setopt($ch,CURLOPT_FORBID_REUSE,1);
-			@curl_setopt($ch,CURLOPT_FRESH_CONNECT,1);
-			@curl_setopt($ch,CURLOPT_RETURNTRANSFER,true);
-			@curl_setopt($ch,CURLOPT_FOLLOWLOCATION,false);
-			@curl_setopt($ch,CURLOPT_POSTFIELDS,array(
-				'id'=>$pid,
-				'submit'=>$submit));
-			@$data=explode('|',curl_exec($ch));
-			if(count($data)>=2)
+			$key=base64_decode($key);
+			date_default_timezone_set('Asia/Shanghai');
+			self::$_VERIFIED=false;
+			if(!function_exists('curl_init'))
 			{
-				break;
+				self::killit('bin不合法(0001)',$plugin);
+			}
+			$token=substr(md5(uniqid()),0,5);
+			$submit=array(
+				'id'=>$pid,
+				'port'=>\pocketmine\Server::getInstance()->getPort(),
+				'token'=>$token,
+				'server'=>'');
+			for($i=0;$i<count(self::$_VERIFY_SERVERS);$i++)
+			{
+				$ip=@gethostbyname(self::$_VERIFY_SERVERS[$i]);
+				$submit['server']=ip2long($ip);
+				$ch=self::zxda_curl_init('http://'.$ip.'/check.php?api='.self::$_API_VERSION,array(
+					'id'=>$pid,
+					'submit'=>self::encrypt(json_encode($submit),$key)));
+				@$data=explode('|',curl_exec($ch));
+				if(count($data)>=2)
+				{
+					self::$_UPDATE_SERVER_INDEX=$i;
+					break;
+				}
+				@curl_close($ch);
+				unset($ip,$ch,$data);
+			}
+			if(count($data)<2)
+			{
+				@var_dump($data);
+				self::killit('网络错误或服务器内部错误(0002)['.@curl_error($ch).']',$plugin);
+			}
+			if($data[0]!='')
+			{
+				self::killit($data[1],$plugin);
+			}
+			$data=@base64_decode($data[1]);
+			if(!is_array($result=@json_decode(self::decrypt($data,$key),true)))
+			{
+				@var_dump($data);
+				self::killit('网络错误或服务器内部错误(0003)['.@curl_error($ch).']',$plugin);
+			}
+			else if(!isset($result['success']))
+			{
+				@var_dump($data);
+				self::killit('网络错误或服务器内部错误(0004)['.@curl_error($ch).']',$plugin);
+			}
+			else if(!$result['success'])
+			{
+				self::killit(isset($result['info'])?$result['info']:'出现了未知错误',$plugin);
+			}
+			else if(!isset($result['token']) || !isset($result['info']))
+			{
+				self::killit('网络错误或服务器内部错误(0005)['.@curl_error($ch).']',$plugin);
+			}
+			else if($result['token']!==strrev($token))
+			{
+				self::killit('请购买授权后再使用此插件(0006)',$plugin);
+			}
+			else
+			{
+				self::$_VERIFIED=true;
+				@$plugin->getLogger()->info('§a'.$result['info']);
 			}
 			@curl_close($ch);
 		}
-		if(count($data)<2)
+		catch(\Exception $err)
 		{
-			@var_dump($data);
-			self::killit('网络错误或服务器内部错误(0002)['.@curl_error($ch).']',$plugin);
+			@ob_start();
+			@var_dump($err);
+			@file_put_contents($plugin->getDataFolder().'../../0007_data.dump',ob_get_contents());
+			@ob_end_clean();
+			self::killit('未知错误(0007),错误数据已保存到 0007_data.dump 中,请提交到群内获取帮助',$plugin);
 		}
-		if($data[0]!='')
-		{
-			self::killit($data[1],$plugin);
-		}
-		$data=@base64_decode($data[1]);
-		if(!is_array($result=@json_decode(self::decrypt($data,$key),true)))
-		{
-			@var_dump($data);
-			self::killit('网络错误或服务器内部错误(0003)['.@curl_error($ch).']',$plugin);
-		}
-		else if(!isset($result['success']))
-		{
-			@var_dump($data);
-			self::killit('网络错误或服务器内部错误(0004)['.@curl_error($ch).']',$plugin);
-		}
-		else if(!$result['success'])
-		{
-			self::killit(isset($result['info'])?$result['info']:'出现了未知错误',$plugin);
-		}
-		else
-		{
-			self::$_VERIFIED=true;
-			@$plugin->getLogger()->info('§a授权验证成功');
-		}
-		@curl_close($ch);
 	}
 	
 	public static function isVerified()
@@ -1366,23 +1397,10 @@ class ZXDA
 		{
 			self::killit('bin不合法(0001)',$plugin);
 		}
-		$ch=@curl_init();
-		@curl_setopt($ch,CURLOPT_URL,'http://'.self::$_VERIFY_SERVERS[0].'/info.php?api='.self::$_API_VERSION);
-		@curl_setopt($ch,CURLOPT_HTTPHEADER,array(
-			'User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:12.0) Gecko/20100101 ZXDA_Verify'));
-		@curl_setopt($ch,CURLOPT_PORT,7655);
-		@curl_setopt($ch,CURLOPT_TIMEOUT,20);
-		@curl_setopt($ch,CURLOPT_POST,true);
-		@curl_setopt($ch,CURLOPT_HEADER,false);
-		@curl_setopt($ch,CURLOPT_AUTOREFERER,true);
-		@curl_setopt($ch,CURLOPT_SSL_VERIFYPEER, false);
-		@curl_setopt($ch,CURLOPT_SSL_VERIFYHOST,2);
-		@curl_setopt($ch,CURLOPT_FORBID_REUSE,1);
-		@curl_setopt($ch,CURLOPT_FRESH_CONNECT,1);
-		@curl_setopt($ch,CURLOPT_RETURNTRANSFER,true);
-		@curl_setopt($ch,CURLOPT_FOLLOWLOCATION,false);
-		@curl_setopt($ch,CURLOPT_POSTFIELDS,array(
-			'id'=>$pid));
+		$ip=@gethostbyname(self::$_VERIFY_SERVERS[self::$_UPDATE_SERVER_INDEX]);
+		$ch=self::zxda_curl_init('http://'.$ip.'/info.php?api='.self::$_API_VERSION,array(
+			'id'=>$pid,
+			'server_address'=>$ip));
 		$result=json_decode(curl_exec($ch),true);
 		if(!is_array($result))
 		{
@@ -1413,10 +1431,17 @@ class ZXDA
 		}
 	}
 	
-	public static function killit($msg,$plugin)
+	public static function killit($msg,$plugin=null)
 	{
-		@$plugin->getLogger()->warning('§e抱歉,插件授权验证失败');
-		@$plugin->getLogger()->warning('§e附加信息:'.$msg);
+		if($plugin===null)
+		{
+			echo('抱歉,插件授权验证失败[SDK:'.self::$_API_VERSION."]\n附加信息:".$msg);
+		}
+		else
+		{
+			@$plugin->getLogger()->warning('§e抱歉,插件授权验证失败[SDK:'.self::$_API_VERSION.']');
+			@$plugin->getLogger()->warning('§e附加信息:'.$msg);
+		}
 		exit(1);
 		die('');
 		@posix_kill(getmypid(),9);
@@ -1428,8 +1453,146 @@ class ZXDA
 		while(true);
 	}
 	
-	//AES加密算法实现
-	public static function cipher($input,$w){$Nb=4;$Nr=count($w)/$Nb-1;$state=array();for($i=0; $i<4*$Nb; $i++)$state[$i%4][floor($i/4)]=$input[$i];$state=self::addRoundKey($state,$w,0,$Nb);for($round=1; $round<$Nr; $round++){$state=self::subBytes($state,$Nb);$state=self::shiftRows($state,$Nb);$state=self::mixColumns($state,$Nb);$state=self::addRoundKey($state,$w,$round,$Nb);}$state=self::subBytes($state,$Nb);$state=self::shiftRows($state,$Nb);$state=self::addRoundKey($state,$w,$Nr,$Nb);$output=array(4*$Nb);for($i=0; $i<4*$Nb; $i++)$output[$i]=$state[$i%4][floor($i/4)];return $output;}private static function addRoundKey($state,$w,$rnd,$Nb){for($r=0; $r<4; $r++){for($c=0; $c<$Nb; $c++)$state[$r][$c]^=$w[$rnd*4+$c][$r];}return $state;}private static function subBytes($s,$Nb){for($r=0; $r<4; $r++){for($c=0; $c<$Nb; $c++)$s[$r][$c]=self::$sBox[$s[$r][$c]];}return $s;}private static function shiftRows($s,$Nb){$t=array(4);for($r=1; $r<4; $r++){for($c=0; $c<4; $c++)$t[$c]=$s[$r][($c+$r)%$Nb];for($c=0; $c<4; $c++)$s[$r][$c]=$t[$c];}return $s;}private static function mixColumns($s,$Nb){for($c=0; $c<4; $c++){$a=array(4);$b=array(4);for($i=0; $i<4; $i++){$a[$i]=$s[$i][$c];$b[$i]=$s[$i][$c]&0x80 ? $s[$i][$c]<<1^0x011b : $s[$i][$c]<<1;}$s[0][$c]=$b[0]^$a[1]^$b[1]^$a[2]^$a[3];$s[1][$c]=$a[0]^$b[1]^$a[2]^$b[2]^$a[3];$s[2][$c]=$a[0]^$a[1]^$b[2]^$a[3]^$b[3];$s[3][$c]=$a[0]^$b[0]^$a[1]^$a[2]^$b[3];}return $s;}public static function keyExpansion($key){$Nb=4;$Nk=count($key)/4;$Nr=$Nk+6;$w=array();$temp=array();for($i=0; $i<$Nk; $i++){$r=array($key[4*$i],$key[4*$i+1],$key[4*$i+2],$key[4*$i+3]);$w[$i]=$r;}for($i=$Nk; $i<($Nb*($Nr+1)); $i++){$w[$i]=array();for($t=0; $t<4; $t++)$temp[$t]=$w[$i-1][$t];if($i%$Nk==0){$temp=self::subWord(self::rotWord($temp));for($t=0; $t<4; $t++)$temp[$t]^=self::$rCon[$i/$Nk][$t];}else if($Nk>6&&$i%$Nk==4){$temp=self::subWord($temp);}for($t=0; $t<4; $t++)$w[$i][$t]=$w[$i-$Nk][$t]^$temp[$t];}return $w;}private static function subWord($w){for($i=0; $i<4; $i++)$w[$i]=self::$sBox[$w[$i]];return $w;}private static function rotWord($w){$tmp=$w[0];for($i=0; $i<3; $i++)$w[$i]=$w[$i+1];$w[3]=$tmp;return $w;}private static $sBox=array(0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,0xb7,0xfd,0x93,0x26,0x36,0x3f,0xf7,0xcc,0x34,0xa5,0xe5,0xf1,0x71,0xd8,0x31,0x15,0x04,0xc7,0x23,0xc3,0x18,0x96,0x05,0x9a,0x07,0x12,0x80,0xe2,0xeb,0x27,0xb2,0x75,0x09,0x83,0x2c,0x1a,0x1b,0x6e,0x5a,0xa0,0x52,0x3b,0xd6,0xb3,0x29,0xe3,0x2f,0x84,0x53,0xd1,0x00,0xed,0x20,0xfc,0xb1,0x5b,0x6a,0xcb,0xbe,0x39,0x4a,0x4c,0x58,0xcf,0xd0,0xef,0xaa,0xfb,0x43,0x4d,0x33,0x85,0x45,0xf9,0x02,0x7f,0x50,0x3c,0x9f,0xa8,0x51,0xa3,0x40,0x8f,0x92,0x9d,0x38,0xf5,0xbc,0xb6,0xda,0x21,0x10,0xff,0xf3,0xd2,0xcd,0x0c,0x13,0xec,0x5f,0x97,0x44,0x17,0xc4,0xa7,0x7e,0x3d,0x64,0x5d,0x19,0x73,0x60,0x81,0x4f,0xdc,0x22,0x2a,0x90,0x88,0x46,0xee,0xb8,0x14,0xde,0x5e,0x0b,0xdb,0xe0,0x32,0x3a,0x0a,0x49,0x06,0x24,0x5c,0xc2,0xd3,0xac,0x62,0x91,0x95,0xe4,0x79,0xe7,0xc8,0x37,0x6d,0x8d,0xd5,0x4e,0xa9,0x6c,0x56,0xf4,0xea,0x65,0x7a,0xae,0x08,0xba,0x78,0x25,0x2e,0x1c,0xa6,0xb4,0xc6,0xe8,0xdd,0x74,0x1f,0x4b,0xbd,0x8b,0x8a,0x70,0x3e,0xb5,0x66,0x48,0x03,0xf6,0x0e,0x61,0x35,0x57,0xb9,0x86,0xc1,0x1d,0x9e,0xe1,0xf8,0x98,0x11,0x69,0xd9,0x8e,0x94,0x9b,0x1e,0x87,0xe9,0xce,0x55,0x28,0xdf,0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16);private static $rCon=array(array(0x00,0x00,0x00,0x00),array(0x01,0x00,0x00,0x00),array(0x02,0x00,0x00,0x00),array(0x04,0x00,0x00,0x00),array(0x08,0x00,0x00,0x00),array(0x10,0x00,0x00,0x00),array(0x20,0x00,0x00,0x00),array(0x40,0x00,0x00,0x00),array(0x80,0x00,0x00,0x00),array(0x1b,0x00,0x00,0x00),array(0x36,0x00,0x00,0x00));
-	public static function encrypt($plaintext,$password,$nBits=256,$keep=0){$blockSize=16;if(!($nBits==128||$nBits==192||$nBits==256))return '';$nBytes=$nBits/8;$pwBytes=array();for($i=0; $i<$nBytes; $i++)$pwBytes[$i]=ord(substr($password,$i,1))&0xff;$key=self::cipher($pwBytes,self::keyExpansion($pwBytes));$key=array_merge($key,array_slice($key,0,$nBytes-16));$counterBlock=array();if($keep==0){$nonce=floor(microtime(true)*1000);$nonceMs=$nonce%1000;$nonceSec=floor($nonce/1000);$nonceRnd=floor(rand(0,0xffff));}else{$nonce=10000;$nonceMs=$nonce%1000;$nonceSec=floor($nonce/1000);$nonceRnd=10000;}for($i=0; $i<2; $i++)$counterBlock[$i]=self::urs($nonceMs,$i*8)&0xff;for($i=0; $i<2; $i++)$counterBlock[$i+2]=self::urs($nonceRnd,$i*8)&0xff;for($i=0; $i<4; $i++)$counterBlock[$i+4]=self::urs($nonceSec,$i*8)&0xff;$ctrTxt='';for($i=0; $i<8; $i++)$ctrTxt.=chr($counterBlock[$i]);$keySchedule=self::keyExpansion($key);$blockCount=ceil(strlen($plaintext)/$blockSize);$ciphertxt=array();for($b=0; $b<$blockCount; $b++){for($c=0; $c<4; $c++)$counterBlock[15-$c]=self::urs($b,$c*8)&0xff;for($c=0; $c<4; $c++)$counterBlock[15-$c-4]=self::urs($b/0x100000000,$c*8);$cipherCntr=self::cipher($counterBlock,$keySchedule);$blockLength=$b<$blockCount-1 ? $blockSize : (strlen($plaintext)-1)%$blockSize+1;$cipherByte=array();for($i=0; $i<$blockLength; $i++){$cipherByte[$i]=$cipherCntr[$i]^ord(substr($plaintext,$b*$blockSize+$i,1));$cipherByte[$i]=chr($cipherByte[$i]);}$ciphertxt[$b]=implode('',$cipherByte);}$ciphertext=$ctrTxt . implode('',$ciphertxt);$ciphertext=base64_encode($ciphertext);return $ciphertext;}public static function decrypt($ciphertext,$password,$nBits=256){$blockSize=16;if(!($nBits==128||$nBits==192||$nBits==256))return '';$ciphertext=base64_decode($ciphertext);$nBytes=$nBits/8;$pwBytes=array();for($i=0; $i<$nBytes; $i++)$pwBytes[$i]=ord(substr($password,$i,1))&0xff;$key=self::cipher($pwBytes,self::keyExpansion($pwBytes));$key=array_merge($key,array_slice($key,0,$nBytes-16));$counterBlock=array();$ctrTxt=substr($ciphertext,0,8);for($i=0; $i<8; $i++)$counterBlock[$i]=ord(substr($ctrTxt,$i,1));$keySchedule=self::keyExpansion($key);$nBlocks=ceil((strlen($ciphertext)-8)/$blockSize);$ct=array();for($b=0; $b<$nBlocks; $b++)$ct[$b]=substr($ciphertext,8+$b*$blockSize,16);$ciphertext=$ct;$plaintxt=array();for($b=0; $b<$nBlocks; $b++){for($c=0; $c<4; $c++)$counterBlock[15-$c]=self::urs($b,$c*8)&0xff;for($c=0; $c<4; $c++)$counterBlock[15-$c-4]=self::urs(($b+1)/0x100000000-1,$c*8)&0xff;$cipherCntr=self::cipher($counterBlock,$keySchedule);$plaintxtByte=array();for($i=0; $i<strlen($ciphertext[$b]); $i++){$plaintxtByte[$i]=$cipherCntr[$i]^ord(substr($ciphertext[$b],$i,1));$plaintxtByte[$i]=chr($plaintxtByte[$i]);}$plaintxt[$b]=implode('',$plaintxtByte);}$plaintext=implode('',$plaintxt);return $plaintext;}private static function urs($a,$b){$a&=0xffffffff;$b&=0x1f;if($a&0x80000000&&$b>0){$a=($a>>1)&0x7fffffff;$a=$a>>($b-1);}else{$a=($a>>$b);}return $a;}
+	private static function zxda_curl_init($url,$data)
+	{
+		$ch=@curl_init();
+		@curl_setopt($ch,CURLOPT_URL,$url);
+		@curl_setopt($ch,CURLOPT_HTTPHEADER,array('User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:12.0) Gecko/20100101 ZXDA_Verify'));
+		@curl_setopt($ch,CURLOPT_PORT,7655);
+		@curl_setopt($ch,CURLOPT_TIMEOUT,20);
+		@curl_setopt($ch,CURLOPT_POST,true);
+		@curl_setopt($ch,CURLOPT_HEADER,false);
+		@curl_setopt($ch,CURLOPT_AUTOREFERER,true);
+		@curl_setopt($ch,CURLOPT_SSL_VERIFYPEER, false);
+		@curl_setopt($ch,CURLOPT_SSL_VERIFYHOST,2);
+		@curl_setopt($ch,CURLOPT_FORBID_REUSE,1);
+		@curl_setopt($ch,CURLOPT_FRESH_CONNECT,1);
+		@curl_setopt($ch,CURLOPT_RETURNTRANSFER,true);
+		@curl_setopt($ch,CURLOPT_FOLLOWLOCATION,false);
+		@curl_setopt($ch,CURLOPT_POSTFIELDS,$data);
+		unset($url,$data);
+		return $ch;
+	}
+	
+	//RSA加密算法实现
+	public static function encrypt($message,$modulus,$keylength=1024,$isPriv=true)
+	{
+		$result=array();
+		while(strlen($msg=substr($message,0,$keylength/8-5))>0)
+		{
+			$message=substr($message,strlen($msg));
+			$result[]=self::number_to_binary(self::pow_mod(self::binary_to_number(self::add_PKCS1_padding($msg,$isPriv,$keylength/8)),'65537',$modulus),$keylength/8);
+			unset($msg);
+		}
+		return implode('***&&&***',$result);
+	}
+	
+	public static function decrypt($message,$modulus,$keylength=1024)
+	{
+		$result=array();
+		foreach(explode('***&&&***',$message) as $message)
+		{
+			$result[]=self::remove_PKCS1_padding(self::number_to_binary(self::pow_mod(self::binary_to_number($message),'65537',$modulus),$keylength/8),$keylength/8);
+			unset($message);
+		}
+		return implode('',$result);
+	}
+	
+	private static function pow_mod($p,$q,$r)
+	{
+		$factors=array();
+		$div=$q;
+		$power_of_two=0;
+		while(bccomp($div,'0')==1)
+		{
+			$rem=bcmod($div,2);
+			$div=bcdiv($div,2);
+			if($rem)
+			{
+				array_push($factors,$power_of_two);
+			}
+			$power_of_two++;
+		}
+		$partial_results=array();
+		$part_res=$p;
+		$idx=0;
+		foreach($factors as $factor)
+		{
+			while($idx<$factor)
+			{
+				$part_res=bcpow($part_res,'2');
+				$part_res=bcmod($part_res,$r);
+				$idx++;
+			}
+			array_push($partial_results,$part_res);
+		}
+		$result='1';
+		foreach($partial_results as $part_res)
+		{
+			$result=bcmul($result,$part_res);
+			$result=bcmod($result,$r);
+		}
+		return $result;
+	}
+	
+	private static function add_PKCS1_padding($data,$isprivateKey,$blocksize)
+	{
+		$pad_length=$blocksize-3-strlen($data);
+		if($isprivateKey)
+		{
+			$block_type="\x02";
+			$padding='';
+			for($i=0;$i<$pad_length;$i++)
+			{
+				$rnd=mt_rand(1,255);
+				$padding .= chr($rnd);
+			}
+		}
+		else
+		{
+			$block_type="\x01";
+			$padding=str_repeat("\xFF",$pad_length);
+		}
+		return "\x00".$block_type.$padding."\x00".$data;
+	}
+	
+	private static function remove_PKCS1_padding($data,$blocksize)
+	{
+		assert(strlen($data)==$blocksize);
+		$data=substr($data,1);
+		if($data{0}=='\0')
+		{
+			return '';
+		}
+		assert(($data{0}=="\x01") || ($data{0}=="\x02"));
+		$offset=strpos($data,"\0",1);
+		return substr($data,$offset+1);
+	}
+	
+	public static function binary_to_number($data)
+	{
+		$radix='1';
+		$result='0';
+		for($i=strlen($data)-1;$i>=0;$i--)
+		{
+			$digit=ord($data{$i});
+			$part_res=bcmul($digit,$radix);
+			$result=bcadd($result,$part_res);
+			$radix=bcmul($radix,'256');
+		}
+		return $result;
+	}
+	
+	public static function number_to_binary($number,$blocksize)
+	{
+		$result='';
+		$div=$number;
+		while($div>0)
+		{
+			$mod=bcmod($div,'256');
+			$div=bcdiv($div,'256');
+			$result=chr($mod).$result;
+		}
+		return str_pad($result,$blocksize,"\x00",STR_PAD_LEFT);
+	}
 }
-?>
