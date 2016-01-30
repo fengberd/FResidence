@@ -90,7 +90,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			ZXDA::killit($data['message'],$this);
 			return;
 		}
-		ZXDA::check($this,40,'MTQ0OTAxMDc0NjM5NjUwMTI2ODUzNDgyNjI5MDg4NTY0MTE4MTE0NDYwNzA4MjE5ODcwMjM0NDcxNDk4NjY1NDI1MjgwNTMwMzkwNjQ3MDY3MjEyODc5NTc0NjMyNzgxNzg0Mzk5NTg1NTQ5OTE0MjEwMTA5NDcxODM3MDU1NTgyNDkxMzU4NjUzMjI4NzQxNDY4MDE0ODEzMjcxMDA4MTIwNTU0ODQzMjIwODA4NDM0NTE1MTgzNDM0NDU1Mzc3ODI0NzI0MTM5NjQyMTcyMjMzMDMxMjc5MDA4MzU5NTcxNDAwMTQ3MTUwNDE1NTIyNjMyOTc2MDU4OTYxNTE2MDExMzk5MjA1NDc3OTUxNzMzMDM1NTQ5ODQ0OTYwMDMxMTQ5NjkzMjAzOTUxODk3MjI1MjI5');
+		ZXDA::check($this,40,'MTQ0OTAxMDc0NjM5NjUwMTI2ODUzNDgyNjI5MDg4NTY0MTE4MTE0NDYwNzA4MjE5ODcwMjM0NDcxNDk4NjY1NDI1MjgwNTMwMzkwNjQ3MDY3MjEyODc5NTc0NjMyNzgxNzg0Mzk5NTg1NTQ5OTE0MjEwMTA5NDcxODM3MDU1NTgyNDkxMzU4NjUzMjI4NzQxNDY4MDE0ODEzMjcxMDA4MTIwNTU0ODQzMjIwODA4NDM0NTE1MTgzNDM0NDU1Mzc3ODI0NzI0MTM5NjQyMTcyMjMzMDMxMjc5MDA4MzU5NTcxNDAwMTQ3MTUwNDE1NTIyNjMyOTc2MDU4OTYxNTE2MDExMzk5MjA1NDc3OTUxNzMzMDM1NTQ5ODQ0OTYwMDMxMTQ5NjkzMjAzOTUxODk3MjI1MjI5');*/
 		$data=ZXDA::getInfo($this,40);
 		if($data['success'])
 		{
@@ -106,7 +106,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		else
 		{
 			$this->getLogger()->warning('更新检查失败');
-		}*/
+		}
 		if(!defined('EOL'))
 		{
 			define('EOL',"\n");
@@ -131,6 +131,9 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			break;
 		}
 		Item::addCreativeItem(Item::get($this->selectItem,0));
+		
+		$this->systemTask=new SystemTask($this);
+		$this->getServer()->getScheduler()->scheduleRepeatingTask($this->systemTask,20);
 		
 		$reflection=new \ReflectionClass(\get_class($this));
 		foreach($reflection->getMethods() as $method)
@@ -1024,7 +1027,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			$event->getPlayer()->sendMessage($msg);
 			$this->select[$name]->currentResidence=false;
 		}
-		else if($res!==false && $this->select[$name]->currentResidence->getID()!==$res->getID())
+		else if($res!==false && ($this->select[$name]->currentResidence===false || $this->select[$name]->currentResidence->getID()!==$res->getID()))
 		{
 			$this->select[$name]->currentResidence=$res;
 			$msg=$res->getMessage('enter');
