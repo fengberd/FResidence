@@ -476,7 +476,7 @@ class Main extends PluginBase implements Listener
 			$sender->sendMessage($help);
 			break;
 		case 'message':
-			if(!isset($args[2]))
+			if(!isset($args[3]))
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 使用方法: /res message <领地> <索引> <信息> 消息索引如下'.self::$NL.'enter - 进入消息'.self::$NL.'leave - 离开消息'.self::$NL.'permission - 提示没有权限的消息');
 				break;
@@ -498,7 +498,7 @@ class Main extends PluginBase implements Listener
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 不存在这块领地');
 				break;
 			}
-			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()))
+			if(!$sender->isOp() && $res->getOwner()!==strtolower($sender->getName()))
 			{
 				$sender->sendMessage(TextFormat::RED.'[FResidence] 你没有权限修改这块领地的消息');
 				break;
