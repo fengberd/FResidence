@@ -90,8 +90,8 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			ZXDA::killit($data['message'],$this);
 			return;
 		}
-		ZXDA::check($this,40,'MTMxODQwODkxOTAwNjQyMzcyNzY1Njg3ODM0NTU5NTQxMzI1OTkzMjAyMTkwNTQwNTYwMzkxNTE1MjA1NjA5OTcxNDc5NjMxNzIxMjMwOTAwOTYwNTc2MTQ1MzI0MTUwMTQ4MjgyMDI4NzAwNDQ0MDQ4OTE1MDUxNjg1MjYwNzc3MDM5Nzg3NDQ2ODU4NjQ0NjA5MTU5NjY2NjA2NTA4NzEyNTUyMTI5ODE0NDk1NzYwOTcxNjcxODQ2MDYyNjYzNDc4MDg1OTg3NDEyMzk3NTIzMzE2NjgyMTk3NzEyMjk2NTk2ODY0Nw==');
-		$data=ZXDA::getInfo($this,40);*/
+		ZXDA::check($this,40,'MTMxODQwODkxOTAwNjQyMzcyNzY1Njg3ODM0NTU5NTQxMzI1OTkzMjAyMTkwNTQwNTYwMzkxNTE1MjA1NjA5OTcxNDc5NjMxNzIxMjMwOTAwOTYwNTc2MTQ1MzI0MTUwMTQ4MjgyMDI4NzAwNDQ0MDQ4OTE1MDUxNjg1MjYwNzc3MDM5Nzg3NDQ2ODU4NjQ0NjA5MTU5NjY2NjA2NTA4NzEyNTUyMTI5ODE0NDk1NzYwOTcxNjcxODQ2MDYyNjYzNDc4MDg1OTg3NDEyMzk3NTIzMzE2NjgyMTk3NzEyMjk2NTk2ODY0Nw==');*/
+		$data=ZXDA::getInfo($this,40);
 		if($data['success'])
 		{
 			if(version_compare($data['version'],$this->getDescription()->getVersion())<=0)
