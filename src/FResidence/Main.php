@@ -84,12 +84,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function onLoad()
 	{
 		ZXDA::init(40,$this);
-		ZXDA::requestCheck();
+		//ZXDA::requestCheck();
 	}
 	
 	public function onEnable()
 	{
-		ZXDA::tokenCheck('MTMxODQwODkxOTAwNjQyMzcyNzY1Njg3ODM0NTU5NTQxMzI1OTkzMjAyMTkwNTQwNTYwMzkxNTE1MjA1NjA5OTcxNDc5NjMxNzIxMjMwOTAwOTYwNTc2MTQ1MzI0MTUwMTQ4MjgyMDI4NzAwNDQ0MDQ4OTE1MDUxNjg1MjYwNzc3MDM5Nzg3NDQ2ODU4NjQ0NjA5MTU5NjY2NjA2NTA4NzEyNTUyMTI5ODE0NDk1NzYwOTcxNjcxODQ2MDYyNjYzNDc4MDg1OTg3NDEyMzk3NTIzMzE2NjgyMTk3NzEyMjk2NTk2ODY0Nw==');
+		/*ZXDA::tokenCheck('MTMxODQwODkxOTAwNjQyMzcyNzY1Njg3ODM0NTU5NTQxMzI1OTkzMjAyMTkwNTQwNTYwMzkxNTE1MjA1NjA5OTcxNDc5NjMxNzIxMjMwOTAwOTYwNTc2MTQ1MzI0MTUwMTQ4MjgyMDI4NzAwNDQ0MDQ4OTE1MDUxNjg1MjYwNzc3MDM5Nzg3NDQ2ODU4NjQ0NjA5MTU5NjY2NjA2NTA4NzEyNTUyMTI5ODE0NDk1NzYwOTcxNjcxODQ2MDYyNjYzNDc4MDg1OTg3NDEyMzk3NTIzMzE2NjgyMTk3NzEyMjk2NTk2ODY0Nw==');
 		$data=ZXDA::getInfo($this,40);
 		if($data['success'])
 		{
@@ -105,7 +105,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		else
 		{
 			$this->getLogger()->warning('更新检查失败');
-		}
+		}*/
 		if(!defined('EOL'))
 		{
 			define('EOL',"\n");
