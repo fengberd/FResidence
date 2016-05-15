@@ -1,9 +1,10 @@
 name: FResidence
 main: FResidence\Main
-version: 1.0.9
+version: 1.1.0
 api: [1.0.0]
 load: POSTWORLD
 author: FENGberd
+depend: ["ZXDAKernel"]
 commands:
  residence:
   aliases: ["res"]
