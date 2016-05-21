@@ -84,28 +84,28 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function onLoad()
 	{
 		ZXDA::init(40,$this);
-		//ZXDA::requestCheck();
+		ZXDA::requestCheck();
 	}
 	
 	public function onEnable()
 	{
-		/*ZXDA::tokenCheck('MTMxODQwODkxOTAwNjQyMzcyNzY1Njg3ODM0NTU5NTQxMzI1OTkzMjAyMTkwNTQwNTYwMzkxNTE1MjA1NjA5OTcxNDc5NjMxNzIxMjMwOTAwOTYwNTc2MTQ1MzI0MTUwMTQ4MjgyMDI4NzAwNDQ0MDQ4OTE1MDUxNjg1MjYwNzc3MDM5Nzg3NDQ2ODU4NjQ0NjA5MTU5NjY2NjA2NTA4NzEyNTUyMTI5ODE0NDk1NzYwOTcxNjcxODQ2MDYyNjYzNDc4MDg1OTg3NDEyMzk3NTIzMzE2NjgyMTk3NzEyMjk2NTk2ODY0Nw==');
-		$data=ZXDA::getInfo($this,40);
+		ZXDA::tokenCheck('MTMxODQwODkxOTAwNjQyMzcyNzY1Njg3ODM0NTU5NTQxMzI1OTkzMjAyMTkwNTQwNTYwMzkxNTE1MjA1NjA5OTcxNDc5NjMxNzIxMjMwOTAwOTYwNTc2MTQ1MzI0MTUwMTQ4MjgyMDI4NzAwNDQ0MDQ4OTE1MDUxNjg1MjYwNzc3MDM5Nzg3NDQ2ODU4NjQ0NjA5MTU5NjY2NjA2NTA4NzEyNTUyMTI5ODE0NDk1NzYwOTcxNjcxODQ2MDYyNjYzNDc4MDg1OTg3NDEyMzk3NTIzMzE2NjgyMTk3NzEyMjk2NTk2ODY0Nw==');
+		$data=ZXDA::getInfo();
 		if($data['success'])
 		{
-			if(version_compare($data['version'],$this->getDescription()->getVersion())<=0)
+			if(version_compare($data['version'],$this->getDescription()->getVersion())>0)
 			{
-				$this->getLogger()->info(TextFormat::GREEN.'您当前使用的插件是最新版');
-			}
-			else
-			{
-				$this->getLogger()->info(TextFormat::GREEN.'检测到新版本,最新版:'.$data['version'].",更新日志:\n".$data['update_info']);
+				$this->getLogger()->info(TextFormat::GREEN.'检测到新版本,最新版:'.$data['version'].",更新日志:\n    ".str_replace("\n","\n    ",$data['update_info']));
 			}
 		}
 		else
 		{
-			$this->getLogger()->warning('更新检查失败');
-		}*/
+			$this->getLogger()->warning('更新检查失败:'.$data['message']);
+		}
+		if(ZXDA::isTrialVersion())
+		{
+			$this->getLogger()->warning('当前正在使用试用版授权,试用时间到后将强制关闭服务器');
+		}
 		if(!defined('EOL'))
 		{
 			define('EOL',"\n");
@@ -154,6 +154,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	
 	public function onCommand(\pocketmine\command\CommandSender $sender,\pocketmine\command\Command $command,$label,array $args)
 	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
 		if(!isset($args[0]))
 		{
 			$sender->sendMessage('[FResidence] '.TextFormat::RED.'请使用 /res help 查看帮助');
@@ -948,6 +953,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	
 	public function systemTaskCallback($currentTick)
 	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
 		foreach($this->select as $player)
 		{
 			if($player->currentResidence!==false && $player->currentResidence->getPermission('healing'))
@@ -967,6 +977,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	 */
 	public function onPlayerInteract(PlayerInteractEvent $event)
 	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
 		if($event->getAction()==PlayerInteractEvent::RIGHT_CLICK_BLOCK)
 		{
 			if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$event->getPlayer()->isOp() && ($this->isProtectBlock($event->getBlock()) || $this->isBlockedItem($event->getItem())) && !$res->getPlayerPermission($event->getPlayer()->getName(),'use'))
@@ -1004,6 +1019,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	 */
 	public function onPlayerMove(\pocketmine\event\player\PlayerMoveEvent $event)
 	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
 		$name=$event->getPlayer()->getName();
 		$this->select[$name]->checkMoveTick--;
 		$this->select[$name]->move[]=$event->getFrom();
@@ -1047,6 +1067,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	 */
 	public function onBlockPlace(\pocketmine\event\block\BlockPlaceEvent $event)
 	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
 		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
 		{
 			$event->getPlayer()->sendMessage($res->getMessage('permission'));
@@ -1065,6 +1090,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	 */
 	public function onBlockBreak(\pocketmine\event\block\BlockBreakEvent $event)
 	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
 		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
 		{
 			$event->getPlayer()->sendMessage($res->getMessage('permission'));
@@ -1098,6 +1128,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	 */
 	public function onBlockUpdate(\pocketmine\event\block\BlockUpdateEvent $event)
 	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
 		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res=$event->getBlock()->getId()>=8 && $event->getBlock()->getId()<=11 && !$res->getPermission('flow',true))
 		{
 			$event->setCancelled();
@@ -1110,6 +1145,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	 */
 	public function onEntityDamage(\pocketmine\event\entity\EntityDamageEvent $event)
 	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
 		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getEntity())))!==false && !$res->getPermission('damage'))
 		{
 			$event->setCancelled();
@@ -1128,6 +1168,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	 */
 	public function onPlayerJoin(\pocketmine\event\player\PlayerJoinEvent $event)
 	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
 		$this->select[$event->getPlayer()->getName()]=new PlayerInfo($event->getPlayer());
 		unset($event);
 	}
@@ -1137,6 +1182,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	 */
 	public function onPlayerQuit(\pocketmine\event\player\PlayerQuitEvent $event)
 	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
 		if(isset($this->select[$event->getPlayer()->getName()]) && !$this->select[$event->getPlayer()->getName()]->player->isConnected())
 		{
 			unset($this->select[$event->getPlayer()->getName()]);
@@ -1146,6 +1196,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	
 	public function isProtectBlock(Block $block)
 	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
 		switch($block->getId())
 		{
 		case Item::BED_BLOCK:
@@ -1167,6 +1222,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	
 	public function isBlockedItem(Item $item)
 	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
 		switch($item->getId())
 		{
 		case Item::FLINT_STEEL:
@@ -1191,6 +1251,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	//领地判断算法移植自PC的Residence，若侵犯原作者权益请联系我,Gmail:FENGberd@gmail.com
 	public function check($pos1,$pos2,$pos3,$pos4)
 	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
 		if($pos1 instanceof Vector3)
 		{
 			$x1=$pos1->getX();
@@ -1268,7 +1333,7 @@ class ZXDA
 	private static $_TOKEN=false;
 	private static $_PLUGIN=null;
 	private static $_VERIFIED=false;
-	private static $_API_VERSION=5011;
+	private static $_API_VERSION=5012;
 	
 	public static function init($pid,$plugin)
 	{
@@ -1305,6 +1370,20 @@ class ZXDA
 			exit();
 		}
 		return $version;
+	}
+	
+	public static function isTrialVersion()
+	{
+		try
+		{
+			self::checkKernelVersion();
+			return \ZXDAKernel\Main::isTrialVersion(self::$_PID);
+		}
+		catch(\Exception $err)
+		{
+			@file_put_contents(self::$_PLUGIN->getServer()->getDataPath().'0007_data.dump',var_export($err,true));
+			self::killit('未知错误(0007),错误数据已保存到 0007_data.dump 中,请提交到群内获取帮助');
+		}
 	}
 	
 	public static function requestCheck()
@@ -1421,4 +1500,3 @@ class ZXDA
 	private static function binary_to_number($data){$radix='1';$result='0';for($i=strlen($data)-1;$i>=0;$i--){$digit=ord($data{$i});$part_res=bcmul($digit,$radix);$result=bcadd($result,$part_res);$radix=bcmul($radix,'256');}return $result;}
 	private static function number_to_binary($number,$blocksize){$result='';$div=$number;while($div>0){$mod=bcmod($div,'256');$div=bcdiv($div,'256');$result=chr($mod).$result;}return str_pad($result,$blocksize,"\x00",STR_PAD_LEFT);}
 }
-
