@@ -675,7 +675,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限传送到这块领地');
 				break;
 			}
-			$sender->teleport($res->getTeleportPos());
+			if(($pos=$res->getTeleportPos())===false)
+			{
+				$sender->sendMessage('[FResidence] '.TextFormat::RED.'传送失败,目标领地所在世界未加载');
+				break;
+			}
+			$sender->teleport($pos);
 			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'传送到领地 '.$args[1]);
 			break;
 		case 'tpset':
