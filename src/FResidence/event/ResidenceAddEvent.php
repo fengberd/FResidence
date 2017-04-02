@@ -1,12 +1,7 @@
 <?php
 namespace FResidence\event;
 
-use pocketmine\event\Cancellable;
-use pocketmine\event\plugin\PluginEvent;
-
-use FResidence\Main;
-
-class ResidenceAddEvent extends FResidenceEvent implements Cancellable
+class ResidenceAddEvent extends CancellableFResidenceEvent
 {
 	private $money;
 	private $select1;
@@ -14,9 +9,9 @@ class ResidenceAddEvent extends FResidenceEvent implements Cancellable
 	private $resname;
 	private $player;
 	
-	public function __construct(Main $plugin,$money,$select1,$select2,$resname,$player)
+	public function __construct(\FResidence\Main $plugin,$money,$select1,$select2,$resname,$player)
 	{
-		parent::__construct($plugin);
+		parent::__construct($plugin,null);
 		$this->select1=$select1;
 		$this->select2=$select2;
 		$this->resname=$resname;
@@ -73,4 +68,3 @@ class ResidenceAddEvent extends FResidenceEvent implements Cancellable
 		unset($val);
 	}
 }
-?>

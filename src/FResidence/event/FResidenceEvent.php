@@ -1,17 +1,20 @@
 <?php
 namespace FResidence\event;
 
-use pocketmine\event\plugin\PluginEvent;
-
-use FResidence\Main;
-
-abstract class FResidenceEvent extends PluginEvent
+abstract class FResidenceEvent extends \pocketmine\event\plugin\PluginEvent
 {
 	public static $handlerList=null;
 	
-	public function __construct(Main $plugin)
+	private $res;
+	
+	public function __construct(\FResidence\Main $plugin,$res=null)
 	{
 		parent::__construct($plugin);
+		$this->res=$res;
+	}
+	
+	public function getResidence()
+	{
+		return $this->res;
 	}
 }
-?>

@@ -14,24 +14,28 @@ use pocketmine\utils\TextFormat;
 use pocketmine\event\player\PlayerInteractEvent;
 use pocketmine\event\entity\EntityRegainHealthEvent;
 
-use FResidence\provider\YAMLProvider;
-
 use FResidence\event\ResidenceAddEvent;
 use FResidence\event\ResidenceRemoveEvent;
 
+use FResidence\utils\Utils;
+use FResidence\utils\Economy;
+use FResidence\utils\Messages;
+use FResidence\utils\Permissions;
+
+use FResidence\provider\YamlProvider;
+
 class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Listener
 {
-	private static $obj;
-	public $select=array();
-	private $perms=array('move',
-		'build',
-		'use',
-		'pvp',
-		'damage',
-		'tp',
-		'flow',
-		'healing');
+	private static $obj=null;
+	
+	public static function getInstance()
+	{
+		return self::$obj;
+	}
+	
 	public $provider=null;
+	
+	public $players=array();
 	public $whiteListWorld=array();
 	
 	public function getProvider()
@@ -39,31 +43,23 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		return $this->provider;
 	}
 	
-	public static function getInstance()
-	{
-		return self::$obj;
-	}
-	
 	public function loadConfig()
 	{
 		@mkdir($this->getDataFolder());
 		$this->config=new Config($this->getDataFolder().'config.yml',Config::YAML,array());
+		$this->moneyName=$this->config->get('MoneyName','元');
+		$this->selectItem=intval($this->config->get('SelectItem',Item::WOODEN_HOE));
+		$this->preferEconomy=$this->config->get('PreferEconomy','EconomyAPI');
+		$this->checkMoveTick=intval($this->config->get('CheckMoveTick',10));
+		$this->moneyPerBlock=$this->config->get('MoneyPerBlock',0.05)*1;
+		$this->maxResidenceCount=intval($this->config->get('MaxResidenceCount',3));
 		if($this->config->exists('landItem'))
 		{
-			$this->selectItem=intval($this->config->get('landItem',Item::WOODEN_HOE));
-			$this->moneyPerBlock=$this->config->get('blockMoney',0.05)*1;
 			$this->moneyName=$this->config->get('moneyName','元');
+			$this->selectItem=intval($this->config->get('landItem',Item::WOODEN_HOE));
 			$this->checkMoveTick=intval($this->config->get('checkMoveTick',10));
-			$this->playerMaxCount=intval($this->config->get('playerMaxCount',3));
-			$this->config->set('WhiteListWorld',$this->config->get('whiteListWorld',array()));
-		}
-		else
-		{
-			$this->selectItem=intval($this->config->get('SelectItem',Item::WOODEN_HOE));
-			$this->moneyPerBlock=$this->config->get('MoneyPerBlock',0.05)*1;
-			$this->moneyName=$this->config->get('MoneyName','元');
-			$this->checkMoveTick=intval($this->config->get('CheckMoveTick',10));
-			$this->playerMaxCount=intval($this->config->get('MaxResidenceCount',3));
+			$this->moneyPerBlock=$this->config->get('blockMoney',0.05)*1;
+			$this->maxResidenceCount=intval($this->config->get('playerMaxCount',3));
 		}
 		foreach((array)$this->config->get('WhiteListWorld',array()) as $world)
 		{
@@ -74,11 +70,26 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			'Provider'=>'yaml',
 			'MoneyName'=>$this->moneyName,
 			'SelectItem'=>$this->selectItem,
+			'PreferEconomy'=>$this->preferEconomy,
 			'CheckMoveTick'=>$this->checkMoveTick,
 			'MoneyPerBlock'=>$this->moneyPerBlock,
-			'MaxResidenceCount'=>$this->playerMaxCount,
-			'WhiteListWorld'=>$this->whiteListWorld));
+			'WhiteListWorld'=>$this->whiteListWorld,
+			'MaxResidenceCount'=>$this->maxResidenceCount));
 		$this->config->save();
+		Economy::init($this->preferEconomy);
+		switch(strtolower($this->config->get('Provider')))
+		{
+		/*case 'mysql':
+			break;
+		case 'sqlite3':
+			break;*/
+		default:
+			$this->getLogger()->warning('配置错误:不支持的Provider类型,已切换为Yaml模式');
+		case 'yaml':
+		case 'yml':
+			$this->provider=new YamlProvider($this);
+			break;
+		}
 	}
 	
 	public function onLoad()
@@ -115,33 +126,18 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			self::$obj=$this;
 		}
 		$this->loadConfig();
-		switch(strtolower($this->config->get('Provider','yaml')))
-		{
-		/*case 'mysql':
-			break;
-		case 'sqlite':
-		case 'sqlite3':
-			break;*/
-		default:
-			$this->getLogger()->warning('配置错误:不支持的Provider类型,已切换为yaml模式');
-		case 'yaml':
-		case 'yml':
-			$this->provider=new YAMLProvider($this);
-			break;
-		}
 		Item::addCreativeItem(Item::get($this->selectItem,0));
 		
-		$this->systemTask=new SystemTask($this);
-		$this->getServer()->getScheduler()->scheduleRepeatingTask($this->systemTask,20);
+		$this->getServer()->getScheduler()->scheduleRepeatingTask($this->systemTask=new SystemTask($this),20);
 		
-		$reflection=new \ReflectionClass(\get_class($this));
+		$reflection=new \ReflectionClass(get_class($this));
 		foreach($reflection->getMethods() as $method)
 		{
 			if(!$method->isStatic())
 			{
 				$priority=0;
 				$parameters=$method->getParameters();
-				if(\count($parameters)===1 and $parameters[0]->getClass() instanceof \ReflectionClass and \is_subclass_of($parameters[0]->getClass()->getName(),\pocketmine\event\Event::class))
+				if(count($parameters)===1 and $parameters[0]->getClass() instanceof \ReflectionClass and is_subclass_of($parameters[0]->getClass()->getName(),\pocketmine\event\Event::class))
 				{
 					$class=$parameters[0]->getClass()->getName();
 					$reflection=new \ReflectionClass($class);
@@ -150,6 +146,26 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			}
 			unset($method);
 		}
+	}
+	
+	public function systemTaskCallback($currentTick)
+	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
+		foreach($this->players as $player)
+		{
+			if($player->inResidence() && $player->getResidence()->getPermission(Permissions::PERMISSION_HEALING))
+			{
+				$ev=new EntityRegainHealthEvent($player->getPlayer(),1,EntityRegainHealthEvent::CAUSE_CUSTOM);
+				$player->heal($ev->getAmount(),$ev);
+				unset($ev);
+			}
+			unset($player);
+		}
+		unset($currentTick);
 	}
 	
 	public function onCommand(\pocketmine\command\CommandSender $sender,\pocketmine\command\Command $command,$label,array $args)
@@ -200,7 +216,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'请在游戏中执行这个指令');
 				break;
 			}
-			if(!isset($this->select[$sender->getName()]) || !$this->select[$sender->getName()]->isSelectFinish())
+			if(!isset($this->players[$sender->getName()]) || !$this->players[$sender->getName()]->isSelectFinish())
 			{
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'请先使用选点工具来选择两个点再进行圈地');
 				break;
@@ -215,9 +231,9 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'无效领地名称');
 				break;
 			}
-			if(!$sender->isOp() && count($this->provider->queryResidencesByOwner($sender->getName()))>=$this->playerMaxCount)
+			if(!$sender->isOp() && count($this->provider->queryResidencesByOwner($sender->getName()))>=$this->maxResidenceCount)
 			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你拥有的的领地数量已经达到了上限 '.$this->playerMaxCount.' 块');
+				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你拥有的的领地数量已经达到了上限 '.$this->maxResidenceCount.' 块');
 				break;
 			}
 			$rid=$this->provider->queryResidenceByName($args[1]);
@@ -226,14 +242,14 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'已存在重名领地');
 				break;
 			}
-			$select1=$this->select[$sender->getName()]->getP1();
-			$select2=$this->select[$sender->getName()]->getP2();
+			$select1=$this->players[$sender->getName()]->getP1();
+			$select2=$this->players[$sender->getName()]->getP2();
 			if($select1->getLevel()->getFolderName()!=$select2->getLevel()->getFolderName())
 			{
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'请在同一个世界选点圈地');
 				break;
 			}
-			$money=$this->moneyPerBlock*Utils::calcBoxSize($select1,$select2);
+			$money=$this->moneyPerBlock*Utils::calucateSize($select1,$select2);
 			if(!$sender->isOp() && $money>IncludeAPI::Economy_getMoney($sender))
 			{
 				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有足够的'.$this->moneyName.'来圈地 ,需要 '.$money.' '.$this->moneyName);
@@ -262,8 +278,8 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			}
 			$this->provider->addResidence($ev->getPos1(),$ev->getPos2(),$sender,$ev->getResName());
 			IncludeAPI::Economy_setMoney($sender,IncludeAPI::Economy_getMoney($sender)-$ev->getMoney());
-			$this->select[$sender->getName()]->setP1(false);
-			$this->select[$sender->getName()]->setP2(false);
+			$this->players[$sender->getName()]->setPos1(false);
+			$this->players[$sender->getName()]->setPos2(false);
 			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'领地创建成功 ,花费 '.$money.' '.$this->moneyName);
 			break;
 		case 'remove':
@@ -853,14 +869,14 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			switch(isset($args[1])?$args[1]:'')
 			{
 			case 'size':
-				if(!isset($this->select[$sender->getName()]) || !$this->select[$sender->getName()]->isSelectFinish())
+				if(!isset($this->players[$sender->getName()]) || !$this->players[$sender->getName()]->isSelectFinish())
 				{
 					$sender->sendMessage('[FResidence] '.TextFormat::RED.'请先选择两个点再进行此操作');
 					break;
 				}
-				$p1=$this->select[$sender->getName()]->getP1();
-				$p2=$this->select[$sender->getName()]->getP2();
-				$size=Utils::calcBoxSize($p1,$p2);
+				$p1=$this->players[$sender->getName()]->getP1();
+				$p2=$this->players[$sender->getName()]->getP2();
+				$size=Utils::calucateSize($p1,$p2);
 				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'当前选区信息:'.EOL.
 					'    选区大小: '.TextFormat::YELLOW.$size.' 方块'.EOL.
 					'    选区价格: '.TextFormat::YELLOW.($this->moneyPerBlock*$size).' '.$this->moneyName.EOL.
@@ -868,18 +884,18 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				unset($p1,$p2);
 				break;
 			case 'chunk':
-				$this->select[$sender->getName()]->setP1(new Position(($sender->getX()>>4)*16,0,($sender->getZ()>>4)*16,$sender->getLevel()));
-				$this->select[$sender->getName()]->setP2(new Position(($sender->getX()>>4)*16+16,128,($sender->getZ()>>4)*16+16,$sender->getLevel()));
+				$this->players[$sender->getName()]->setPos1(new Position(($sender->getX()>>4)*16,0,($sender->getZ()>>4)*16,$sender->getLevel()));
+				$this->players[$sender->getName()]->setPos2(new Position(($sender->getX()>>4)*16+16,128,($sender->getZ()>>4)*16+16,$sender->getLevel()));
 				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'已选中当前所在区块 ,使用 /res select size 查看选区价格');
 				break;
 			case 'vert':
-				if(!isset($this->select[$sender->getName()]) || !$this->select[$sender->getName()]->isSelectFinish())
+				if(!isset($this->players[$sender->getName()]) || !$this->players[$sender->getName()]->isSelectFinish())
 				{
 					$sender->sendMessage('[FResidence] '.TextFormat::RED.'请先选择两个点再进行此操作');
 					break;
 				}
-				$this->select[$sender->getName()]->p1->y=0;
-				$this->select[$sender->getName()]->p2->y=128;
+				$this->players[$sender->getName()]->p1->y=0;
+				$this->players[$sender->getName()]->p2->y=128;
 				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'已将选区Y坐标扩展到0-128格 ,使用 /res select size 查看选区价格');
 				break;
 			default:
@@ -893,8 +909,8 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					$p2->x=intval($p2->getX()+$args[1]);
 					$p2->y=min(max(intval($p2->getY()+$args[2]),0),128);
 					$p2->z=intval($p2->getZ()+$args[3]);
-					$this->select[$sender->getName()]->setP1($p1);
-					$this->select[$sender->getName()]->setP2($p2);
+					$this->players[$sender->getName()]->setPos1($p1);
+					$this->players[$sender->getName()]->setPos2($p2);
 					unset($p1,$p2);
 					$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'已选中以当前坐标为中心的指定范围 ,使用 /res select size 查看选区价格');
 				}
@@ -956,30 +972,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		return true;
 	}
 	
-	public function systemTaskCallback($currentTick)
-	{
-		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
-		foreach($this->select as $player)
-		{
-			if($player->currentResidence!==false && $player->currentResidence->getPermission('healing'))
-			{
-				$player=$player->player;
-				$ev=new EntityRegainHealthEvent($player,1,EntityRegainHealthEvent::CAUSE_CUSTOM);
-				$player->heal($ev->getAmount(),$ev);
-				unset($ev);
-			}
-			unset($player);
-		}
-		unset($currentTick);
-	}
-	
-	/**
-	 * @priority MONITOR
-	 */
 	public function onPlayerInteract(PlayerInteractEvent $event)
 	{
 		ZXDA::isTrialVersion();
@@ -989,39 +981,35 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		}
 		if($event->getAction()==PlayerInteractEvent::RIGHT_CLICK_BLOCK)
 		{
-			if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$event->getPlayer()->isOp() && ($this->isProtectBlock($event->getBlock()) || $this->isBlockedItem($event->getItem())) && !$res->getPlayerPermission($event->getPlayer()->getName(),'use'))
+			$player=$this->players[$event->getPlayer()->getName()];
+			if(($res=$this->provider->getResidenceByPosition($event->getBlock()))!==null)
 			{
-				$msg=$res->getMessage('permission');
-				$event->getPlayer()->sendMessage($msg);
-				$event->setCancelled();
-			}
-			else if($event->getItem()->getId()==$this->selectItem)
-			{
-				$this->select[$event->getPlayer()->getName()]->setP1($event->getBlock());
-				$event->getPlayer()->sendMessage('[FResidence] 已设置第一个点');
-				if(($select2=$this->select[$event->getPlayer()->getName()]->getP2())!==false)
+				if(!$player->isOp() && $res->getOwner()!==Utils::getPlayerName($player) && ($this->isProtectBlock($event->getBlock()) || $this->isBlockedItem($event->getItem())) && !$res->hasPermission($event->getPlayer(),Permissions::PERMISSION_USE))
 				{
-					$select1=$event->getBlock();
-					if($select1->getLevel()->getFolderName()!=$select2->getLevel()->getFolderName())
-					{
-						$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::RED.'请在同一个世界选点圈地');
-					}
-					$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'选区已设定,需要 '.($this->moneyPerBlock*Utils::calcBoxSize($select1,$select2)).' '.$this->moneyName.'来创建领地');
+					$player->sendMessage($res->getMessage(Messages::INDEX_PERMISSION));
+					$event->setCancelled();
 				}
-				$event->setCancelled();
 			}
-			else if($res===false && in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),$this->whiteListWorld) && !$event->getPlayer()->isOp())
+			else
 			{
-				$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'抱歉,当前世界需要先圈地才能进行建筑');
-				$event->setCancelled();
+				if($event->getItem()->getId()==$this->selectItem)
+				{
+					$player->setPos1($event->getBlock());
+					$player->sendMessage('[FResidence] '.TextFormat::YELLOW.'已设置第一个点');
+					$player->validateSelect($this->moneyPerBlock,$this->moneyName);
+					$event->setCancelled();
+				}
+				else if(in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),$this->whiteListWorld) && !$player->isOp())
+				{
+					$player->sendMessage('[FResidence] '.TextFormat::YELLOW.'抱歉,当前世界需要先圈地才能进行建筑');
+					$event->setCancelled();
+				}
 			}
+			unset($player,$res);
 		}
-		unset($event,$res,$msg,$select1,$select2);
+		unset($event);
 	}
 	
-	/**
-	 * @priority MONITOR
-	 */
 	public function onPlayerMove(\pocketmine\event\player\PlayerMoveEvent $event)
 	{
 		ZXDA::isTrialVersion();
@@ -1029,47 +1017,48 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
-		$name=$event->getPlayer()->getName();
-		$this->select[$name]->checkMoveTick--;
-		$this->select[$name]->move[]=$event->getFrom();
-		if(count($this->select[$name]->move)>$this->select[$name]->checkMoveTick)
+		$player=$this->players[$event->getPlayer()->getName()];
+		$player->checkMoveTick--;
+		$player->movementLog[]=$event->getFrom();
+		if(count($player->movementLog)>$player->checkMoveTick)
 		{
-			array_shift($this->select[$name]->move);
+			array_shift($player->movementLog);
 		}
-		if($this->select[$name]->checkMoveTick>0)
+		if($player->checkMoveTick>0)
 		{
-			unset($name,$event);
+			unset($event);
 			return;
 		}
-		$this->select[$name]->checkMoveTick=$this->checkMoveTick;
-		$res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getTo()));
-		if($res!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$event->getPlayer()->isOp() && !$res->getPlayerPermission($event->getPlayer()->getName(),'move'))
+		$player->checkMoveTick=$this->checkMoveTick;
+		if(($res=$this->provider->getResidenceByPosition($event->getTo()))!==null)
 		{
-			$event->getPlayer()->teleport($this->select[$name]->move[0]);
-			$event->getPlayer()->sendPopup($res->getMessage('permission'));
+			if($res->getOwner()!==Utils::getPlayerName($player) && !$player->isOp() && !$res->hasPermission($player,Permissions::PERMISSION_MOVE))
+			{
+				$player->teleport($player->movementLog[0]);
+				$player->sendTip($res->getMessage(Messages::INDEX_PERMISSION));
+			}
+			else if(!$player->inResidence() || $player->getResidence()->getID()!==$res->getID())
+			{
+				$player->sendMessage(str_replace(array('%name','%owner'),array(
+					$res->getName(),
+					$res->getOwner()),$res->getMessage(Messages::INDEX_ENTER)));
+				$player->setResidence($res);
+			}
 		}
-		else if($res===false && $this->select[$name]->currentResidence!==false)
+		else
 		{
-			$msg=$this->select[$name]->currentResidence->getMessage('leave');
-			$msg=str_replace('%name',$this->select[$name]->currentResidence->getName(),$msg);
-			$msg=str_replace('%owner',$this->select[$name]->currentResidence->getOwner(),$msg);
-			$event->getPlayer()->sendMessage($msg);
-			$this->select[$name]->currentResidence=false;
+			if($player->inResidence())
+			{
+				$res=$player->getResidence();
+				$player->sendMessage(str_replace(array('%name','%owner'),array(
+					$res->getName(),
+					$res->getOwner()),$res->getMessage(Messages::INDEX_LEAVE)));
+				$player->setResidence(null);
+			}
 		}
-		else if($res!==false && ($this->select[$name]->currentResidence===false || $this->select[$name]->currentResidence->getID()!==$res->getID()))
-		{
-			$this->select[$name]->currentResidence=$res;
-			$msg=$res->getMessage('enter');
-			$msg=str_replace('%name',$res->getName(),$msg);
-			$msg=str_replace('%owner',$res->getOwner(),$msg);
-			$event->getPlayer()->sendMessage($msg);
-		}
-		unset($event,$res,$msg);
+		unset($event,$res,$player);
 	}
 	
-	/**
-	 * @priority MONITOR
-	 */
 	public function onBlockPlace(\pocketmine\event\block\BlockPlaceEvent $event)
 	{
 		ZXDA::isTrialVersion();
@@ -1077,22 +1066,27 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
-		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
+		if(($res=$this->provider->getResidenceByPosition($event->getBlock()))!==null)
 		{
-			$event->getPlayer()->sendMessage($res->getMessage('permission'));
-			$event->setCancelled();
+			$player=$this->players[$event->getPlayer()->getName()];
+			if($res->getOwner()!==Utils::getPlayerName($player) && !$res->hasPermission($player,Permissions::PERMISSION_BUILD) && !$player->isOp())
+			{
+				$player->sendMessage($res->getMessage(Messages::INDEX_PERMISSION));
+				$event->setCancelled();
+			}
+			unset($player);
 		}
-		else if($res===false && in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),$this->whiteListWorld) && !$event->getPlayer()->isOp())
+		else
 		{
-			$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'抱歉,当前世界需要先圈地才能进行建筑');
-			$event->setCancelled();
+			if(in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),$this->whiteListWorld) && !$event->getPlayer()->isOp())
+			{
+				$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'抱歉,当前世界需要先圈地才能进行建筑');
+				$event->setCancelled();
+			}
 		}
 		unset($event,$res);
 	}
 	
-	/**
-	 * @priority MONITOR
-	 */
 	public function onBlockBreak(\pocketmine\event\block\BlockBreakEvent $event)
 	{
 		ZXDA::isTrialVersion();
@@ -1100,37 +1094,33 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
-		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res->getOwner()!==strtolower($event->getPlayer()->getName()) && !$res->getPlayerPermission($event->getPlayer()->getName(),'build') && !$event->getPlayer()->isOp())
+		$player=$this->players[$event->getPlayer()->getName()];
+		if(($res=$this->provider->getResidenceByPosition($event->getBlock()))!==false)
 		{
-			$event->getPlayer()->sendMessage($res->getMessage('permission'));
-			$event->setCancelled();
-		}
-		else if($event->getItem()->getId()==$this->selectItem)
-		{
-			$this->select[$event->getPlayer()->getName()]->setP2($event->getBlock());
-			$event->getPlayer()->sendMessage('[FResidence] 已设置第二个点');
-			if(($select1=$this->select[$event->getPlayer()->getName()]->getP1())!==false)
+			if($res->getOwner()!==Utils::getPlayerName($player) && !$res->hasPermission($player,Permissions::PERMISSION_BUILD) && !$player->isOp())
 			{
-				$select2=$event->getBlock();
-				if($select1->getLevel()->getFolderName()!=$select2->getLevel()->getFolderName())
-				{
-					$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::RED.'请在同一个世界选点圈地');
-				}
-				$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'选区已设定,需要 '.($this->moneyPerBlock*Utils::calcBoxSize($select1,$select2)).' '.$this->moneyName.'来创建领地');
+				$player->sendMessage($res->getMessage(Messages::INDEX_PERMISSION));
+				$event->setCancelled();
 			}
-			$event->setCancelled();
 		}
-		else if($res===false && in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),$this->whiteListWorld) && !$event->getPlayer()->isOp())
+		else
 		{
-			$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'抱歉,当前世界需要先圈地才能进行建筑');
-			$event->setCancelled();
+			if($event->getItem()->getId()==$this->selectItem)
+			{
+				$player->setPos2($event->getBlock());
+				$player->sendMessage('[FResidence] 已设置第二个点');
+				$player->validateSelect($this->moneyPerBlock,$this->moneyName);
+				$event->setCancelled();
+			}
+			else if(in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),$this->whiteListWorld) && !$player->isOp())
+			{
+				$player->sendMessage('[FResidence] '.TextFormat::YELLOW.'抱歉,当前世界需要先圈地才能进行建筑');
+				$event->setCancelled();
+			}
 		}
-		unset($event,$res,$select1,$select2);
+		unset($event,$res,$player);
 	}
 	
-	/**
-	 * @priority MONITOR
-	 */
 	public function onBlockUpdate(\pocketmine\event\block\BlockUpdateEvent $event)
 	{
 		ZXDA::isTrialVersion();
@@ -1138,16 +1128,14 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
-		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getBlock())))!==false && $res=$event->getBlock()->getId()>=8 && $event->getBlock()->getId()<=11 && !$res->getPermission('flow',true))
+		$block=$event->getBlock();
+		if($block->getId()>=8 && $block->getId()<=11 && ($res=$this->provider->getResidenceByPosition($block))!==null && !$res->getPermission(Permissions::PERMISSION_FLOW))
 		{
 			$event->setCancelled();
 		}
-		unset($event,$res);
+		unset($event,$block,$res);
 	}
 	
-	/**
-	 * @priority MONITOR
-	 */
 	public function onEntityDamage(\pocketmine\event\entity\EntityDamageEvent $event)
 	{
 		ZXDA::isTrialVersion();
@@ -1155,22 +1143,22 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
-		if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($event->getEntity())))!==false && !$res->getPermission('damage'))
+		if(($res=$this->provider->getResidenceByPosition($event->getEntity()))!==null && !$res->getPermission(Permissions::PERMISSION_DAMAGE))
 		{
 			$event->setCancelled();
 		}
-		else if($event instanceof \pocketmine\event\entity\EntityDamageByEntityEvent && $event->getDamager() instanceof Player && $event->getEntity() instanceof Player && $res!==false && strtolower($event->getDamager()->getName())!=$res->getOwner() && !$event->getDamager()->isOp() && !($res->getPlayerPermission($event->getDamager(),'pvp',true) && $res->getPlayerPermission($event->getEntity(),'pvp',true)))
+		else if($event instanceof \pocketmine\event\entity\EntityDamageByEntityEvent && $event->getDamager() instanceof Player && $event->getEntity() instanceof Player)
 		{
-			$event->setCancelled();
-			$msg=$res->getMessage('permission');
-			$event->getDamager()->sendMessage($msg);
+			if(($res!==null && !$res->getPermission(Permissions::PERMISSION_PVP)) || 
+				(($res=$this->provider->getResidenceByPosition($event->getDamager()))!==null && !$res->getPermission(Permissions::PERMISSION_PVP)))
+			{
+				$event->getDamager()->sendMessage($res->getMessage(Messages::INDEX_PERMISSION));
+				$event->setCancelled();
+			}
 		}
-		unset($res,$event,$msg);
+		unset($res,$event);
 	}
 	
-	/**
-	 * @priority NORMAL
-	 */
 	public function onPlayerJoin(\pocketmine\event\player\PlayerJoinEvent $event)
 	{
 		ZXDA::isTrialVersion();
@@ -1178,13 +1166,10 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
-		$this->select[$event->getPlayer()->getName()]=new PlayerInfo($event->getPlayer());
+		$this->players[$event->getPlayer()->getName()]=new PlayerInfo($event->getPlayer());
 		unset($event);
 	}
 	
-	/**
-	 * @priority NORMAL
-	 */
 	public function onPlayerQuit(\pocketmine\event\player\PlayerQuitEvent $event)
 	{
 		ZXDA::isTrialVersion();
@@ -1192,11 +1177,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
-		if(isset($this->select[$event->getPlayer()->getName()]) && !$this->select[$event->getPlayer()->getName()]->player->isConnected())
+		$name=$event->getPlayer()->getName();
+		if(isset($this->players[$name]) && !$this->players[$name]->isConnected())
 		{
-			unset($this->select[$event->getPlayer()->getName()]);
+			unset($this->players[$name]);
 		}
-		unset($event);
+		unset($event,$name);
 	}
 	
 	public function isProtectBlock(Block $block)

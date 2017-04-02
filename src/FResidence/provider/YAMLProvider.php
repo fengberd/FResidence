@@ -1,146 +1,59 @@
 <?php
 namespace FResidence\provider;
 
-use pocketmine\Player;
-use pocketmine\math\Vector3;
 use pocketmine\utils\Config;
-use pocketmine\level\Position;
 
-use FResidence\Main;
+use FResidence\utils\Utils;
 
-class YAMLProvider implements DataProvider
+class YamlProvider implements DataProvider
 {
-	private $config;
+	private $main=null;
+	private $config=null;
 	private $residences=array();
-	private $main;
 	
-	public function __construct(Main $main)
+	public function __construct(\FResidence\Main $main)
 	{
 		$this->main=$main;
 		$this->reload();
 		unset($main);
 	}
 	
-	public function addResidence($startpos,$endpos,$owner,$name,$level=false)
+	public function getConfig()
 	{
-		if($owner instanceof Player)
-		{
-			$owner=$owner->getName();
-		}
-		$owner=strtolower($owner);
-		$this->residences[]=new Residence($this,count($this->residences),array(
-			'name'=>$name,
-			'start'=>array(
-				'x'=>(int)$startpos->getX(),
-				'y'=>(int)$startpos->getY(),
-				'z'=>(int)$startpos->getZ()),
-			'end'=>array(
-				'x'=>(int)$endpos->getX(),
-				'y'=>(int)$endpos->getY(),
-				'z'=>(int)$endpos->getZ()),
-			'level'=>($level===false?$startpos->getLevel()->getFolderName():$level),
-			'owner'=>$owner,
-			'metadata'=>array(
-				'permission'=>Residence::$DefaultPermission,
-				'playerpermission'=>array(),
-				'message'=>array(
-					'enter'=>'欢迎来到 %name ,这里是 %owner 的领地',
-					'leave'=>'你离开了 %name',
-					'permission'=>'你没有权限使用这块领地'),
-				'teleport'=>array(
-					'x'=>(int)$startpos->getX(),
-					'y'=>(int)$startpos->getY(),
-					'z'=>(int)$startpos->getZ()))));
+		return $this->config;
+	}
+	
+	public function addResidence($pos1,$pos2,$owner,$name)
+	{
+		$this->residences[]=new Residence($this,$id=count($this->residences),$name,$owner,$pos1,$pos2);
 		$this->save();
-		unset($startpos,$endpos,$owner,$name);
-		return count($this->residences)-1;
+		unset($pos1,$pos2,$owner,$name);
+		return $id;
 	}
 	
-	public function getAllResidences()
+	public function getResidence($id)
 	{
-		return $this->residences;
+		return isset($this->residences[$id])?$this->residences[$id]:null;
 	}
 	
-	public function getResidence($resid)
-	{
-		if($resid===false)
-		{
-			return false;
-		}
-		return isset($this->residences[$resid])?$this->residences[$resid]:false;
-	}
-	
-	public function removeResidence($resid)
-	{
-		if(!isset($this->residences[$resid]))
-		{
-			return false;
-		}
-		unset($this->residences[$resid],$resid);
-		$this->save();
-		return true;
-	}
-	
-	public function removeResidencesByOwner($owner)
-	{
-		if($owner instanceof Player)
-		{
-			$owner=$owner->getName();
-		}
-		$owner=strtolower($owner);
-		$cou=0;
-		foreach($this->residences as $key=>$res)
-		{
-			if($res->getOwner()===$owner)
-			{
-				unset($this->residences[$key]);
-				$cou++;
-			}
-			unset($key,$res);
-		}
-		$this->save();
-		unset($res,$pos,$key);
-		return $cou;
-	}
-	
-	public function queryResidenceByName($name)
+	public function getResidenceByName($name)
 	{
 		foreach($this->residences as $key=>$res)
 		{
-			if($res->getName()===$name)
+			if($res->getName()==$name)
 			{
-				unset($res,$pos,$name);
-				return $key;
+				unset($key,$name);
+				return $res;
 			}
 			unset($key,$res);
 		}
 		unset($name);
-		return false;
+		return null;
 	}
 	
-	public function queryResidencesByOwner($owner)
+	public function getResidenceByPosition($pos,$level='')
 	{
-		if($owner instanceof Player)
-		{
-			$owner=$owner->getName();
-		}
-		$owner=strtolower($owner);
-		$ret=array();
-		foreach($this->residences as $key=>$res)
-		{
-			if($res->getOwner()===$owner)
-			{
-				$ret[$key]=$res;
-			}
-			unset($key,$res);
-		}
-		unset($owner);
-		return $ret;
-	}
-	
-	public function queryResidenceByPosition($pos,$level='')
-	{
-		if($pos instanceof Position)
+		if($pos instanceof \pocketmine\level\Position)
 		{
 			$level=$pos->getLevel()->getFolderName();
 		}
@@ -148,17 +61,62 @@ class YAMLProvider implements DataProvider
 		{
 			if($res->inResidence($pos,$level))
 			{
-				unset($pos,$level,$res);
-				return $key;
+				unset($pos,$level,$key);
+				return $res;
 			}
 		}
 		unset($pos,$level,$key,$res);
-		return false;
+		return null;
 	}
 	
-	public function getConfig()
+	public function getAllResidences()
 	{
-		return $this->config;
+		return $this->residences;
+	}
+	
+	public function getResidencesByOwner($owner)
+	{
+		$owner=Utils::getPlayerName($owner);
+		$result=array();
+		foreach($this->residences as $key=>$res)
+		{
+			if($res->getOwner()==$owner)
+			{
+				$result[$key]=$res;
+			}
+			unset($key,$res);
+		}
+		unset($owner);
+		return $result;
+	}
+	
+	public function removeResidence($id)
+	{
+		if(!isset($this->residences[$id]))
+		{
+			return false;
+		}
+		unset($this->residences[$id],$id);
+		$this->save();
+		return true;
+	}
+	
+	public function removeResidencesByOwner($owner)
+	{
+		$owner=Utils::getPlayerName($owner);
+		$count=0;
+		foreach($this->residences as $key=>$res)
+		{
+			if($res->getOwner()==$owner)
+			{
+				unset($this->residences[$key]);
+				$count++;
+			}
+			unset($key,$res);
+		}
+		$this->save();
+		unset($res,$key);
+		return $count;
 	}
 	
 	public function save()
@@ -169,7 +127,9 @@ class YAMLProvider implements DataProvider
 			$data[]=$res->getData();
 			unset($res);
 		}
-		$this->config->set('Residences',$data);
+		$this->config->setAll(array(
+			'DataVersion'=>Utils::CONFIG_VERSION,
+			'Residences'=>$data));
 		$this->config->save();
 	}
 	
@@ -188,15 +148,25 @@ class YAMLProvider implements DataProvider
 		{
 			$this->save();
 		}
-		unset($save);
 		@mkdir($this->main->getDataFolder());
 		$this->config=new Config($this->main->getDataFolder().'residence.yml',Config::YAML,array(
-			'DataVersion'=>1,
+			'DataVersion'=>Utils::CONFIG_VERSION,
 			'Residences'=>array()));
-		foreach($this->config->get('Residences') as $arr)
+		$this->config->set('Residences',Utils::updateConfig($this->config->get('DataVersion'),$this->config->get('Residences')));
+		foreach($this->config->get('Residences') as $data)
 		{
-			$this->residences[]=new Residence($this,count($this->residences),$arr);
-			unset($arr);
+			try
+			{
+				$this->residences[]=new Residence($this,count($this->residences),$data);
+			}
+			catch(\Exception $e)
+			{
+				$this->main->getLogger()->warning('加载领地 '.$data['name'].' 失败:'.$e->getMessage());
+				unset($e);
+			}
+			unset($data);
 		}
+		$this->save();
+		unset($save);
 	}
 }

@@ -1,7 +1,7 @@
 <?php
 namespace FResidence\event;
 
-class ResidenceRemoveEvent extends CancellableFResidenceEvent
+class CancellableFResidenceEvent extends FResidenceEvent implements \pocketmine\event\Cancellable
 {
 	public function __construct(\FResidence\Main $plugin,$res)
 	{

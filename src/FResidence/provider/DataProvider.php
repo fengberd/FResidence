@@ -1,24 +1,21 @@
 <?php
 namespace FResidence\provider;
 
-use FResidence\Main;
-
 interface DataProvider
 {
-	public function __construct(Main $main);
-	public function addResidence($startpos,$endpos,$owner,$name,$level);
+	public function __construct(\FResidence\Main $main);
+	
+	public function addResidence($pos1,$pos2,$owner,$name);
+	
+	public function getResidence($id);
+	public function getResidenceByName($name);
+	public function getResidenceByPosition($pos);
 	
 	public function getAllResidences();
-	public function getResidence($resid);
+	public function getResidencesByOwner($owner);
 	
-	public function removeResidence($resid);
+	public function removeResidence($id);
 	public function removeResidencesByOwner($owner);
-	
-	public function queryResidenceByName($name);
-	public function queryResidenceByPosition($pos);
-	public function queryResidencesByOwner($owner);
-	
-	public function getConfig();
 	
 	public function save();
 	public function close($save);

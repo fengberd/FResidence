@@ -20,4 +20,3 @@ class IncludeAPI
 		return EconomyAPI::getInstance()->addMoney($player,$count,$force);
 	}
 }
-?>
