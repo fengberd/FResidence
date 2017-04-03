@@ -4,6 +4,9 @@ namespace FResidence\provider;
 use pocketmine\utils\Config;
 
 use FResidence\utils\Utils;
+use FResidence\utils\Residence;
+
+use FResidence\exception\ResidenceInstantiationException;
 
 class YamlProvider implements DataProvider
 {
@@ -53,13 +56,10 @@ class YamlProvider implements DataProvider
 	
 	public function getResidenceByPosition($pos,$level='')
 	{
-		if($pos instanceof \pocketmine\level\Position)
-		{
-			$level=$pos->getLevel()->getFolderName();
-		}
+		$level=$pos->getLevel()->getFolderName();
 		foreach($this->residences as $key=>$res)
 		{
-			if($res->inResidence($pos,$level))
+			if($res->inResidence($pos))
 			{
 				unset($pos,$level,$key);
 				return $res;
@@ -92,6 +92,10 @@ class YamlProvider implements DataProvider
 	
 	public function removeResidence($id)
 	{
+		if($id instanceof Residence)
+		{
+			$id=$id->getId();
+		}
 		if(!isset($this->residences[$id]))
 		{
 			return false;
@@ -124,7 +128,7 @@ class YamlProvider implements DataProvider
 		$data=array();
 		foreach($this->residences as $res)
 		{
-			$data[]=$res->getData();
+			$data[]=$res->getRawData();
 			unset($res);
 		}
 		$this->config->setAll(array(
@@ -159,9 +163,9 @@ class YamlProvider implements DataProvider
 			{
 				$this->residences[]=new Residence($this,count($this->residences),$data);
 			}
-			catch(\Exception $e)
+			catch(\FResidence\exception\FResidenceException $e)
 			{
-				$this->main->getLogger()->warning('加载领地 '.$data['name'].' 失败:'.$e->getMessage());
+				$this->main->getLogger()->warning('加载领地 '.$data['name'].' 时出现错误:'.$e->getMessage());
 				unset($e);
 			}
 			unset($data);

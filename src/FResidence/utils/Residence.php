@@ -1,7 +1,6 @@
 <?php
 namespace FResidence\utils;
 
-use pocketmine\math\Vector3;
 use pocketmine\level\Position;
 
 class Residence
@@ -21,41 +20,40 @@ class Residence
 	private $message=null;
 	private $permission=null;
 	
-	public function __construct(DataProvider $provider,int $id,string $name,$owner,Position $pos1,Position $pos2)
+	public function __construct(\FResidence\provider\DataProvider $provider,int $id,...$data)
 	{
-		$this->id=$id;
-		$this->name=$name;
-		$this->owner=Utils::getPlayerName($owner);
-		$this->level=$pos1->getLevel()->getFolderName();
-		
-		$this->pos1=$pos1;
-		$this->pos2=$pos2;
-		$this->teleport=$pos1;
-		
-		$this->message=new Messages();
-		$this->permission=new Permissions();
-		
-		$this->_provider=$provider;
-	}
-	
-	public function __construct(DataProvider $provider,int $id,array $data)
-	{
-		if(!($level=\pocketmine\Server::getInstance()->getLevelByName($data['level'])) instanceof \pocketmine\level\Level)
+		if(is_array($data[0]))
 		{
-			throw new \Exception('领地所在世界不存在,已被删除');
+			$data=$data[0];
+			if(!($level=\pocketmine\Server::getInstance()->getLevelByName($data['level'])) instanceof \pocketmine\level\Level)
+			{
+				throw new \FResidence\exception\ResidenceInstantiationException('领地所在世界不存在,已被删除');
+			}
+			$this->name=$data['name'];
+			$this->owner=Utils::getPlayerName($data['owner']);
+			$this->level=strtolower($level->getFolderName());
+			
+			$this->pos1=Utils::parsePosition($data['positions']['pos1'],$level);
+			$this->pos2=Utils::parsePosition($data['positions']['pos2'],$level);
+			$this->teleport=Utils::parsePosition($data['positions']['teleport'],$level);
+			
+			$this->message=new Messages($data['messages'],$this);
+			$this->permission=new Permissions($data['permissions'],$this);
+		}
+		else
+		{
+			$this->name=$data[0];
+			$this->owner=Utils::getPlayerName($data[1]);
+			$this->level=strtolower($data[2]->getLevel()->getFolderName());
+			
+			$this->pos1=$data[2];
+			$this->pos2=$data[3];
+			$this->teleport=$data[2];
+			
+			$this->message=new Messages($this);
+			$this->permission=new Permissions($this);
 		}
 		$this->id=$id;
-		$this->name=$data['name'];
-		$this->owner=Utils::getPlayerName($data['owner']);
-		$this->level=$level->getFolderName();
-		
-		$this->pos1=Utils::parsePosition($data['positions']['pos1'],$level);
-		$this->pos2=Utils::parsePosition($data['positions']['pos2'],$level);
-		$this->teleport=Utils::parsePosition($data['positions']['teleport'],$level);
-		
-		$this->message=new Messages($data['messages']);
-		$this->permission=new Permissions($data['permissions']);
-		
 		$this->_provider=$provider;
 	}
 	
@@ -65,7 +63,7 @@ class Residence
 			'name'=>$this->name,
 			'owner'=>$this->owner,
 			'level'=>$this->level,
-			'messages'=>$this->messages->getRawData(),
+			'messages'=>$this->message->getRawData(),
 			'positions'=>array(
 				'pos1'=>Utils::encodeVector3($this->pos1),
 				'pos2'=>Utils::encodeVector3($this->pos2),
@@ -76,9 +74,10 @@ class Residence
 	public function save()
 	{
 		$this->_provider->save();
+		return $this;
 	}
 	
-	public function getID()
+	public function getId()
 	{
 		return $this->id;
 	}
@@ -95,19 +94,7 @@ class Residence
 	
 	public function getSize()
 	{
-		return Utils::calucateSize($this->pos1,$this->pos2);
-	}
-	
-	public function getOwner()
-	{
-		return $this->owner;
-	}
-	
-	public function setOwner($owner)
-	{
-		$this->owner=Utils::getPlayerName($owner);
-		$this->save();
-		unset($owner);
+		return Utils::calculateSize($this->pos1,$this->pos2);
 	}
 	
 	public function getName()
@@ -120,6 +107,25 @@ class Residence
 		$this->name=$name;
 		$this->save();
 		unset($name);
+		return $this;
+	}
+	
+	public function isOwner($owner)
+	{
+		return $this->owner==Utils::getPlayerName($owner);
+	}
+	
+	public function getOwner()
+	{
+		return $this->owner;
+	}
+	
+	public function setOwner($owner)
+	{
+		$this->owner=Utils::getPlayerName($owner);
+		$this->save();
+		unset($owner);
+		return $this;
 	}
 	
 	public function getMessage(string $index)
@@ -130,6 +136,11 @@ class Residence
 	public function getMessages()
 	{
 		return $this->message;
+	}
+	
+	public function getLevelName()
+	{
+		return $this->level;
 	}
 	
 	public function hasPermission($player,string $index)
@@ -145,6 +156,12 @@ class Residence
 	public function getPermissions()
 	{
 		return $this->permission;
+	}
+	
+	public function setPermissions(Permissions $permission)
+	{
+		$this->permission=$permission;
+		return $this;
 	}
 	
 	public function getTeleportPos()
@@ -164,28 +181,24 @@ class Residence
 		return true;
 	}
 	
-	public function inResidence(Vector3 $pos,$level=null)
+	public function inResidence($pos)
 	{
-		if($level instanceof \pocketmine\level\Level)
+		if(strtolower($pos->getLevel()->getFolderName())!=$this->level)
 		{
-			$level=$level->getFolderName();
-		}
-		if($level!==null && $level!=$this->level)
-		{
-			unset($pos,$level);
+			unset($pos);
 			return false;
 		}
-		$x=$pos->x;
-		$y=$pos->y;
-		$z=$pos->z;
+		$x=$pos->getX();
+		$y=$pos->getY();
+		$z=$pos->getZ();
 		if((($x<=$this->pos1->x && $x>=$this->pos2->x) || ($x>=$this->pos1->x && $x<=$this->pos2->x)) && 
 			(($y<=$this->pos1->y && $y>=$this->pos2->y) || ($y>=$this->pos1->y && $y<=$this->pos2->y)) && 
 			(($z<=$this->pos1->z && $z>=$this->pos2->z) || ($z>=$this->pos1->z && $z<=$this->pos2->z)))
 		{
-			unset($x,$y,$z,$pos,$level);
+			unset($x,$y,$z,$pos);
 			return true;
 		}
-		unset($x,$y,$z,$pos,$level);
+		unset($x,$y,$z,$pos);
 		return false;
 	}
 }

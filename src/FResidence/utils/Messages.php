@@ -51,7 +51,7 @@ class Messages
 	{
 		if(!self::validateIndex($index=strtolower($index)))
 		{
-			throw new \InvalidArgumentException('Invalid message index,please use Messages::INDEX_XXX consts.');
+			throw new \FResidence\exception\InvalidArgumentException('无效消息索引,请使用 Messages::INDEX_XXX 常量');
 		}
 		return $index;
 	}
@@ -60,19 +60,25 @@ class Messages
 	
 	private $messages=array();
 	
-	public function __construct()
+	public function __construct(...$data)
 	{
-		$this->messages=self::getDefaults();
-	}
-	
-	public function __construct(array $data,$residence=null)
-	{
-		$this->messages=self::validate($data);
-		if($residence instanceof Residence)
+		if(isset($data[0]) && is_array($data[0]))
 		{
-			$this->residence=$residence;
+			$this->messages=self::validate($data[0]);
+			if(isset($data[1]) && $data[1] instanceof Residence)
+			{
+				$this->residence=$data[1];
+			}
 		}
-		unset($data,$residence);
+		else
+		{
+			$this->messages=self::getDefaults();
+			if(isset($data[0]) && $data[0] instanceof Residence)
+			{
+				$this->residence=$data[0];
+			}
+		}
+		unset($data);
 	}
 	
 	public function getRawData()

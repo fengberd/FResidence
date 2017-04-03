@@ -8,18 +8,23 @@ class Economy
 	const API_ECONOMY_API='EconomyAPI';
 	const API_ZXDA_COUPONS='ZXDACoupons';
 	
+	public static $MoneyName='';
+	public static $MoneyPerBlock=0;
+	
 	private static $API='';
 	
-	public static function init($preferAPI='')
+	public static function init($preferAPI='',$moneyName,$moneyPerBlock)
 	{
 		$available=array();
+		self::$MoneyName=$moneyName;
+		self::$MoneyPerBlock=$moneyPerBlock;
 		if(class_exists('\\onebone\\economyapi\\EconomyAPI',false))
 		{
 			$available[]=self::API_ECONOMY_API;
 		}
 		if(count($available)==0)
 		{
-			throw new \Exception('无法找到支持的经济API');
+			throw new \FResidence\exception\MissingDependException('鏃犳硶鎵惧埌鏀寔鐨勭粡娴嶢PI');
 		}
 		if(!in_array($preferAPI,$available))
 		{
@@ -31,20 +36,26 @@ class Economy
 	
 	public static function getMoney($player)
 	{
-		$function='self::'.self::$API.'_getMoney';
-		return $function($player);
+		$function='\\FResidence\\utils\\Economy::'.self::$API.'_getMoney';
+		return $function(Utils::getPlayerName($player));
 	}
 	
 	public static function setMoney($player,$count)
 	{
-		$function='self::'.self::$API.'_setMoney';
-		return $function($player,$count);
+		$function='\\FResidence\\utils\\Economy::'.self::$API.'_setMoney';
+		return $function(Utils::getPlayerName($player),$count);
 	}
 	
 	public static function addMoney($player,$count)
 	{
-		$function='self::'.self::$API.'_addMoney';
-		return $function($player,$count);
+		$function='\\FResidence\\utils\\Economy::'.self::$API.'_addMoney';
+		return $function(Utils::getPlayerName($player),$count);
+	}
+	
+	public static function reduceMoney($player,$count)
+	{
+		$function='\\FResidence\\utils\\Economy::'.self::$API.'_reduceMoney';
+		return $function(Utils::getPlayerName($player),$count);
 	}
 	
 	public static function EconomyAPI_getMoney($player)
@@ -52,13 +63,18 @@ class Economy
 		return EconomyAPI::getInstance()->myMoney($player);
 	}
 	
-	public static function EconomyAPI_setMoney($player,$count,$force=false)
+	public static function EconomyAPI_setMoney($player,$count)
 	{
-		return EconomyAPI::getInstance()->setMoney($player,$count,$force);
+		return EconomyAPI::getInstance()->setMoney($player,$count,false,'FResidence')==EconomyAPI::RET_SUCCESS;
 	}
 	
-	public static function EconomyAPI_addMoney($player,$count,$force=false)
+	public static function EconomyAPI_addMoney($player,$count)
 	{
-		return EconomyAPI::getInstance()->addMoney($player,$count,$force);
+		return EconomyAPI::getInstance()->addMoney($player,$count,false,'FResidence')==EconomyAPI::RET_SUCCESS;
+	}
+	
+	public static function EconomyAPI_reduceMoney($player,$count)
+	{
+		return EconomyAPI::getInstance()->reduceMoney($player,$count,false,'FResidence')==EconomyAPI::RET_SUCCESS;
 	}
 }

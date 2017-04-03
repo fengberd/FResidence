@@ -1,6 +1,8 @@
 <?php
 namespace FResidence\utils;
 
+use FResidence\exception\InvalidArgumentException;
+
 class Permissions
 {
 	const PERMISSION_USE='use';
@@ -13,16 +15,22 @@ class Permissions
 	const PERMISSION_DAMAGE='damage';
 	const PERMISSION_HEALING='healing';
 	
-	private static $playerDefaults=array(
-		self::PERMISSION_USE=>false,
-		self::PERMISSION_MOVE=>true,
-		self::PERMISSION_BUILD=>false,
-		self::PERMISSION_TELEPORT=>false);
-	private static $defaults=array_merge(array(
-		self::PERMISSION_PVP=>true,
-		self::PERMISSION_FLOW=>true,
-		self::PERMISSION_DAMAGE=>true,
-		self::PERMISSION_HEALING=>false),$playerDefaults);
+	private static $defaults=array();
+	private static $playerDefaults=array();
+	
+	public static function init()
+	{
+		self::$playerDefaults=array(
+			self::PERMISSION_USE=>false,
+			self::PERMISSION_MOVE=>true,
+			self::PERMISSION_BUILD=>false,
+			self::PERMISSION_TELEPORT=>false);
+		self::$defaults=array_merge(array(
+			self::PERMISSION_PVP=>true,
+			self::PERMISSION_FLOW=>true,
+			self::PERMISSION_DAMAGE=>true,
+			self::PERMISSION_HEALING=>false),self::$playerDefaults);
+	}
 	
 	public static function getDefaults()
 	{
@@ -44,7 +52,7 @@ class Permissions
 			}
 			else
 			{
-				$data[$key]=parseBool($data[$key]);
+				$data[$key]=Utils::parseBool($data[$key]);
 			}
 			unset($key,$val);
 		}
@@ -68,7 +76,7 @@ class Permissions
 	{
 		if(!self::validateIndex($index=strtolower($index)))
 		{
-			throw new \InvalidArgumentException('Invalid permission index,please use Permissions::PERMISSION_XXX consts.');
+			throw new InvalidArgumentException('无效权限索引,请使用 Permissions::PERMISSION_XXX 常量');
 		}
 		return $index;
 	}
@@ -107,7 +115,7 @@ class Permissions
 	{
 		if(!self::validatePlayerIndex($index=strtolower($index)))
 		{
-			throw new \InvalidArgumentException('Invalid permission index,please use Permissions::PERMISSION_XXX consts.');
+			throw new InvalidArgumentException('无效权限索引,请使用 Permissions::PERMISSION_XXX 常量');
 		}
 		return $index;
 	}
@@ -117,25 +125,31 @@ class Permissions
 	private $permissions=array();
 	private $playerPermissions=array();
 	
-	public function __construct()
+	public function __construct(...$data)
 	{
-		$this->permissions=self::getDefaults();
-		$this->playerPermissions=array();
-	}
-	
-	public function __construct(array $data,$residence=null)
-	{
-		$this->permissions=self::validate($data['default']);
-		foreach($data['players'] as $key=>$val)
+		if(isset($data[0]) && is_array($data[0]))
 		{
-			$this->playerPermissions[Utils::getPlayerName($key)]=self::validatePlayer($val);
-			unset($key,$val);
+			$this->permissions=self::validate($data[0]['default']);
+			foreach($data[0]['players'] as $key=>$val)
+			{
+				$this->playerPermissions[Utils::getPlayerName($key)]=self::validatePlayer($val);
+				unset($key,$val);
+			}
+			if(isset($data[1]) && $data[1] instanceof Residence)
+			{
+				$this->residence=$data[1];
+			}
 		}
-		if($residence instanceof Residence)
+		else
 		{
-			$this->residence=$residence;
+			$this->permissions=self::getDefaults();
+			$this->playerPermissions=array();
+			if(isset($data[0]) && $data[0] instanceof Residence)
+			{
+				$this->residence=$data[0];
+			}
 		}
-		unset($data,$residence);
+		unset($data);
 	}
 	
 	public function getRawData()

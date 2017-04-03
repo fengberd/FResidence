@@ -3,6 +3,8 @@ namespace FResidence;
 
 use pocketmine\Player;
 use pocketmine\Server;
+use pocketmine\block as Blocks;
+
 use pocketmine\item\Item;
 use pocketmine\block\Block;
 use pocketmine\level\Level;
@@ -20,6 +22,7 @@ use FResidence\event\ResidenceRemoveEvent;
 use FResidence\utils\Utils;
 use FResidence\utils\Economy;
 use FResidence\utils\Messages;
+use FResidence\utils\PlayerInfo;
 use FResidence\utils\Permissions;
 
 use FResidence\provider\YamlProvider;
@@ -27,6 +30,73 @@ use FResidence\provider\YamlProvider;
 class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Listener
 {
 	private static $obj=null;
+	public static $protectedBlocks=array(
+		Block::TNT,
+		Block::SAPLING,
+		Block::BED_BLOCK,
+		Block::CAKE_BLOCK,
+		Block::SUGARCANE_BLOCK,
+		
+		Block::ANVIL,
+		Block::FURNACE,
+		Block::DROPPER,
+		Block::DISPENSER,
+		Block::ENDER_CHEST,
+		Block::HOPPER_BLOCK,
+		Block::CAULDRON_BLOCK,
+		Block::BURNING_FURNACE,
+		Block::ENCHANTING_TABLE,
+		Block::ITEM_FRAME_BLOCK,
+		Block::FLOWER_POT_BLOCK,
+		
+		Block::LEVER,
+		Block::NOTE_BLOCK,
+		Block::DAYLIGHT_SENSOR,
+		Block::DAYLIGHT_SENSOR_INVERTED);
+	
+	private static $_RES_COMMAND_HELP=array(
+		'select'=>array(1,'/res select <size|chunk|vert|X Y Z>','查看选区大小/选取整个区块/扩展选区Y坐标到0-128/选择以当前坐标为起点 ,半径为指定大小的选区'),
+		
+		// TODO: area
+		'create'=>array(1,'/res create <名称>','创建一个领地'),
+		'remove'=>array(1,'/res remove <名称>','移除指定名称的领地'),
+		'removeall'=>array(0,'/res removeall','移除你的所有领地'),
+		// TODO: subzone
+		
+		'current'=>array(0,'/res current','查询当前在哪块领地上'),
+		'info'=>array(0,'/res info [领地]','查询指定领地/当前所在领地的信息'),
+		'list'=>array(0,'/res list [页码]','列出你的所有领地'),
+		// TODO: sublist
+		'version'=>array(0,'/res version','显示版本信息'),
+		'help'=>array(0,'/res help [页码]','查看使用帮助'),
+		'confirm'=>array(1,'/res confirm <验证码>','确认执行危险操作'),
+		
+		'pset'=>array(4,'/res pset <领地> <玩家> <权限> <true/false>','设置某玩家的领地权限'),
+		'set'=>array(3,'/res set <领地> <权限> <true/false>','设置领地默认权限'),
+		
+		'default'=>array(1,'/res default <领地>','重置领地的所有权限'),
+		'give'=>array(2,'/res give <领地> <玩家>','把领地赠送给某玩家'),
+		'message'=>array(2,'/res message <领地> <索引> [内容]','设置领地的消息内容,不填内容清除消息'),
+		'mirror'=>array(2,'/res mirror <源领地> <目标领地>','将源领地的权限数据复制到目标领地'),
+		'rename'=>array(2,'/res rename <领地> <名字>','重命名领地'),
+		// TODO: renamearea
+		'tp'=>array(1,'/res tp <领地>','传送到某领地'),
+		'tpset'=>array(0,'/res tpset','设置当前坐标为当前领地传送点')
+		// TODO: unstuck
+		);
+	private static $_RESADMIN_COMMAND_HELP=array(
+		'list'=>array(1,'/res list <玩家> [页码]','列出某玩家的所有领地'),
+		'listall'=>array(0,'/res listall','列出服务器上的所有领地'),
+		
+		'removeall'=>array(1,'/resadmin removeall <玩家>','移除某玩家的所有领地'),
+		'setowner'=>array(2,'/resadmin setowner <领地> <玩家>','设置领地的主人'),
+		'server'=>array(1,'/resadmin server <领地>','把领地设置为服务器领地,然后只有管理员能操作'),
+		
+		'reload'=>array(0,'/resadmin reload','重载插件数据'),
+		'parse'=>array(0,'/resadmin parse','转换EconomyLand的数据到插件里,只有后台能使用'),
+		
+		'help'=>array(0,'/resadmin help [页码]','查看使用帮助'),
+		'confirm'=>array(1,'/res confirm <验证码>','确认执行危险操作'));
 	
 	public static function getInstance()
 	{
@@ -76,7 +146,8 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			'WhiteListWorld'=>$this->whiteListWorld,
 			'MaxResidenceCount'=>$this->maxResidenceCount));
 		$this->config->save();
-		Economy::init($this->preferEconomy);
+		Permissions::init();
+		Economy::init($this->preferEconomy,$this->moneyName,$this->moneyPerBlock);
 		switch(strtolower($this->config->get('Provider')))
 		{
 		/*case 'mysql':
@@ -125,26 +196,34 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			self::$obj=$this;
 		}
-		$this->loadConfig();
-		Item::addCreativeItem(Item::get($this->selectItem,0));
-		
-		$this->getServer()->getScheduler()->scheduleRepeatingTask($this->systemTask=new SystemTask($this),20);
-		
-		$reflection=new \ReflectionClass(get_class($this));
-		foreach($reflection->getMethods() as $method)
+		try
 		{
-			if(!$method->isStatic())
+			$this->loadConfig();
+			Item::addCreativeItem(Item::get($this->selectItem,0));
+			
+			$this->getServer()->getScheduler()->scheduleRepeatingTask($this->systemTask=new SystemTask($this),20);
+			
+			$reflection=new \ReflectionClass(get_class($this));
+			foreach($reflection->getMethods() as $method)
 			{
-				$priority=0;
-				$parameters=$method->getParameters();
-				if(count($parameters)===1 and $parameters[0]->getClass() instanceof \ReflectionClass and is_subclass_of($parameters[0]->getClass()->getName(),\pocketmine\event\Event::class))
+				if(!$method->isStatic())
 				{
-					$class=$parameters[0]->getClass()->getName();
-					$reflection=new \ReflectionClass($class);
-					$this->getServer()->getPluginManager()->registerEvent($class,$this,$priority,new \pocketmine\plugin\MethodEventExecutor($method->getName()),$this,false);
+					$priority=0;
+					$parameters=$method->getParameters();
+					if(count($parameters)===1 and $parameters[0]->getClass() instanceof \ReflectionClass and is_subclass_of($parameters[0]->getClass()->getName(),\pocketmine\event\Event::class))
+					{
+						$class=$parameters[0]->getClass()->getName();
+						$reflection=new \ReflectionClass($class);
+						$this->getServer()->getPluginManager()->registerEvent($class,$this,$priority,new \pocketmine\plugin\MethodEventExecutor($method->getName()),$this,false);
+					}
 				}
+				unset($method);
 			}
-			unset($method);
+		}
+		catch(\FResidence\exception\FResidenceException $e)
+		{
+			$this->getLogger()->warning('初始化插件时出现错误: '.$e->getMessage().',即将关闭服务器');
+			$this->getServer()->forceShutdown();
 		}
 	}
 	
@@ -168,6 +247,27 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		unset($currentTick);
 	}
 	
+	public function getPlayer($mixed)
+	{
+		if(is_string($mixed))
+		{
+			$mixed=$this->getServer()->getPlayer($mixed);
+		}
+		if($mixed instanceof \pocketmine\event\player\PlayerEvent)
+		{
+			$mixed=$mixed->getPlayer();
+		}
+		if($mixed instanceof Player || $mixed instanceof PlayerInfo)
+		{
+			$mixed=$mixed->getId();
+		}
+		if(is_int($mixed))
+		{
+			return isset($this->players[$mixed])?$this->players[$mixed]:null;
+		}
+		return null;
+	}
+	
 	public function onCommand(\pocketmine\command\CommandSender $sender,\pocketmine\command\Command $command,$label,array $args)
 	{
 		ZXDA::isTrialVersion();
@@ -177,285 +277,38 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		}
 		if(!isset($args[0]))
 		{
-			$sender->sendMessage('[FResidence] '.TextFormat::RED.'请使用 /res help 查看帮助');
-			unset($sender,$command,$label,$args);
-			return true;
+			$args[0]='help';
 		}
-		switch($args[0])
+		$args[0]=strtolower($args[0]);
+		try
 		{
-		case 'reload':
-			if(!$sender->isOp())
+			if(strtolower($command->getName())=='residenceadmin')
 			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'权限不足');
-				unset($sender,$command,$label,$args);
-				return false;
-			}
-			$this->loadConfig();
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'重载完成');
-			break;
-		case 'parse':
-			if($sender instanceof Player)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限使用这个指令');
-				break;
-			}
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'开始转换领地数据');
-			$land=new Config($this->getDataFolder().'../EconomyLand/Land.yml',Config::YAML,array());
-			$cou=0;
-			foreach($land->getAll() as $l)
-			{
-				$this->provider->addResidence(new Vector3($l['startX'],0,$l['startZ']),new Vector3($l['endX'],128,$l['endZ']),$l['owner'],'parse_'.$l['ID'],$l['level']);
-				$cou++;
-				unset($l);
-			}
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'数据转换完成,共处理 '.$cou.' 块领地');
-			break;
-		case 'create':
-			if(!$sender instanceof Player)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'请在游戏中执行这个指令');
-				break;
-			}
-			if(!isset($this->players[$sender->getName()]) || !$this->players[$sender->getName()]->isSelectFinish())
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'请先使用选点工具来选择两个点再进行圈地');
-				break;
-			}
-			if(!isset($args[1]))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res create <名称>');
-				break;
-			}
-			if(strlen($args[1])<=0 || strlen($args[1])>=60)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'无效领地名称');
-				break;
-			}
-			if(!$sender->isOp() && count($this->provider->queryResidencesByOwner($sender->getName()))>=$this->maxResidenceCount)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你拥有的的领地数量已经达到了上限 '.$this->maxResidenceCount.' 块');
-				break;
-			}
-			$rid=$this->provider->queryResidenceByName($args[1]);
-			if($rid!==false && $this->provider->getResidence($rid)!==false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'已存在重名领地');
-				break;
-			}
-			$select1=$this->players[$sender->getName()]->getP1();
-			$select2=$this->players[$sender->getName()]->getP2();
-			if($select1->getLevel()->getFolderName()!=$select2->getLevel()->getFolderName())
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'请在同一个世界选点圈地');
-				break;
-			}
-			$money=$this->moneyPerBlock*Utils::calucateSize($select1,$select2);
-			if(!$sender->isOp() && $money>IncludeAPI::Economy_getMoney($sender))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有足够的'.$this->moneyName.'来圈地 ,需要 '.$money.' '.$this->moneyName);
-				break;
-			}
-			$break=false;
-			foreach($this->provider->getAllResidences() as $r)
-			{
-				if($r->getLevel()==$select1->getLevel()->getFolderName() && $this->check($r->getStart(),$r->getEnd(),$select1,$select2))
+				if($sender->hasPermission('Residence.admin'))
 				{
-					$sender->sendMessage('[FResidence] '.TextFormat::RED.'选区与领地 '.$r->getName().' 重叠 ,不能覆盖 !');
-					unset($r);
-					$break=true;
-					break;
-				}
-				unset($r);
-			}
-			if($break)
-			{
-				break;
-			}
-			$this->getServer()->getPluginManager()->callEvent($ev=new ResidenceAddEvent($this,$money,$select1,$select2,$args[1],$sender));
-			if($ev->isCancelled())
-			{
-				break;
-			}
-			$this->provider->addResidence($ev->getPos1(),$ev->getPos2(),$sender,$ev->getResName());
-			IncludeAPI::Economy_setMoney($sender,IncludeAPI::Economy_getMoney($sender)-$ev->getMoney());
-			$this->players[$sender->getName()]->setPos1(false);
-			$this->players[$sender->getName()]->setPos2(false);
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'领地创建成功 ,花费 '.$money.' '.$this->moneyName);
-			break;
-		case 'remove':
-			if(!isset($args[1]))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res remove <名称>');
-				break;
-			}
-			if($args[1]=='spawn' && $sender instanceof Player)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'权限不足');
-				break;
-			}
-			$rid=$this->provider->queryResidenceByName($args[1]);
-			$res=$this->provider->getResidence($rid);
-			if($rid===false || $res===false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'领地不存在');
-				break;
-			}
-			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限移除这块领地');
-				break;
-			}
-			$this->getServer()->getPluginManager()->callEvent($ev=new ResidenceRemoveEvent($this,$res));
-			if($ev->isCancelled())
-			{
-				break;
-			}
-			$this->provider->removeResidence($rid);
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'领地移除成功');
-			break;
-		case 'give':
-			if(!isset($args[2]) || $args[2]=='')
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res give <领地> <玩家>');
-				break;
-			}
-			if($args[1]=='spawn' && $sender instanceof Player)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'权限不足');
-				break;
-			}
-			$rid=$this->provider->queryResidenceByName($args[1]);
-			$res=$this->provider->getResidence($rid);
-			if($rid===false || $res===false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'领地不存在');
-				break;
-			}
-			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限赠送这块领地');
-				break;
-			}
-			$res->setOwner($args[2]);
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'成功把领地 '.$args[1].' 赠送给玩家 '.$args[2]);
-			break;
-		case 'removeall':
-			if(!$sender instanceof Player)
-			{
-				if(!isset($args[1]))
-				{
-					$sender->sendMessage('[FResidence] '.TextFormat::RED.'请在游戏中执行这个指令或指定要移除的玩家');
+					$this->onResidenceAdminCommand($sender,$args);
 				}
 				else
 				{
-					$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'成功移除玩家 '.$args[1].' 的所有领地 (操作 '.$this->provider->removeResidencesByOwner($args[1]).' 块领地)');
+					$sender->sendMessage(Utils::getRedString('权限不足'));
 				}
-				break;
-			}
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'成功移除你的所有领地 (操作 '.$this->provider->removeResidencesByOwner($sender->getName()).' 块领地)');
-			break;
-		case 'info':
-			if(isset($args[1]))
-			{
-				if(($res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1])))===false)
-				{
-					$sender->sendMessage('[FResidence] '.TextFormat::RED.'不存在该名字的领地');
-				}
-				else
-				{
-					$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'领地信息查询结果:'.EOL.
-						'    领地名称 : '.TextFormat::YELLOW.$res->getName().EOL.
-						'    领地主人 : '.TextFormat::YELLOW.$res->getOwner().EOL.
-						'    领地大小 : '.TextFormat::YELLOW.$res->getSize().' 方块'.EOL.
-						'    所在世界 : '.TextFormat::YELLOW.$res->getLevel());
-				}
-				break;
-			}
-			//这里不能break
-		case 'current':
-			if(!$sender instanceof Player)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'请在游戏中执行这个指令或指定要查询的领地');
-				break;
-			}
-			if(($res=$this->provider->getResidence($this->provider->queryResidenceByPosition($sender)))===false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'当前位置没有领地');
 			}
 			else
 			{
-				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'领地信息查询结果:'.EOL.
-					'    领地名称 : '.TextFormat::YELLOW.$res->getName().EOL.
-					'    领地主人 : '.TextFormat::YELLOW.$res->getOwner().EOL.
-					'    领地大小 : '.TextFormat::YELLOW.$res->getSize().' 方块'.EOL.
-					'    所在世界 : '.TextFormat::YELLOW.$res->getLevel());
+				$this->onResidenceCommand($sender,$args);
 			}
-			break;
-		case 'list':
-			if($sender->isOp())
-			{
-				if(!isset($args[2]))
-				{
-					if(!$sender instanceof Player)
-					{
-						$sender->sendMessage('[FResidence] '.TextFormat::RED.'请在游戏中执行这个指令或指定要查询的玩家');
-						break;
-					}
-				}
-				else
-				{
-					$target=$args[2];
-				}
-			}
-			if(!isset($target))
-			{
-				$target=$sender->getName();
-			}
-			if(!isset($args[1]))
-			{
-				$page=1;
-			}
-			else
-			{
-				$page=(int)$args[1];
-			}
-			if($page<=0)
-			{
-				$page=1;
-			}
-			$arr=$this->provider->queryResidencesByOwner($target);
-			if(count($arr)==0)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'该玩家没有任何一块领地');
-				break;
-			}
-			if(($page-1)*5>count($arr))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'页码超出范围');
-				break;
-			}
-			$all=(int)(count($arr)/5);
-			if($all<=0)
-			{
-				$all=0;
-			}
-			$all++;
-			$help=TextFormat::GREEN.'====Residence List ['.$page.'/'.$all.']===='.EOL;
-			$page--;
-			foreach($arr as $key=>$res)
-			{
-				if($page*5<=$key && ($page+1)*5>$key)
-				{
-					$help.=TextFormat::YELLOW.$res->getName().' - 大小 '.$res->getSize().' 方块 ,所在世界 : '.$res->getLevel().EOL;
-				}
-				unset($res,$key);
-			}
-			$sender->sendMessage($help);
-			break;
+		}
+		catch(\FResidence\exception\FResidenceException $e)
+		{
+			$sender->sendMessage(Utils::getRedString('无法完成操作: '.$e->getMessage()));
+		}
+		/*
+		switch(isset($args[0])?$args[0]:'help')
+		{
 		case 'listall':
 			if(!$sender->isOp())
 			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限使用这个指令');
+				$sender->sendRedMessage('你没有权限使用这个指令');
 				break;
 			}
 			if(!isset($args[1]))
@@ -473,12 +326,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			$arr=$this->provider->getAllResidences();
 			if(count($arr)==0)
 			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'服务器里还没创建过任何领地');
+				$sender->sendRedMessage('服务器里还没创建过任何领地');
 				break;
 			}
 			if(($page-1)*5>count($arr))
 			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'页码超出范围');
+				$sender->sendRedMessage('页码超出范围');
 				break;
 			}
 			$all=(int)(count($arr)/5);
@@ -499,231 +352,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			}
 			$sender->sendMessage($help);
 			break;
-		case 'message':
-			if(!isset($args[3]))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res message <领地> <索引> <信息> 消息索引如下'.EOL.
-					'    enter - 进入消息'.EOL.
-					'    leave - 离开消息'.EOL.
-					'    permission - 权限提示消息');
-				break;
-			}
-			if($args[1]=='spawn' && $sender instanceof Player)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'权限不足');
-				break;
-			}
-			$args[2]=strtolower($args[2]);
-			if($args[2]!='enter' && $args[2]!='leave' && $args[2]!='permission')
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'错误的消息索引 ,只能为以下值的任意一个 :'.EOL.
-					'    enter - 进入消息'.EOL.
-					'    leave - 离开消息'.EOL.
-					'    permission - 提示没有权限的消息');
-				break;
-			}
-			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
-			if($res===false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'领地不存在');
-				break;
-			}
-			if(!$sender->isOp() && $res->getOwner()!==strtolower($sender->getName()))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限修改这块领地');
-				break;
-			}
-			$res->setMessage($args[2],implode(' ',array_slice($args,3)));
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'成功设置领地 '.$args[1].' 的 '.$args[2].' 消息数据');
-			break;
-		case 'default':
-			if(!isset($args[1]))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法 :/res default <领地>');
-				break;
-			}
-			if($args[1]=='spawn' && $sender instanceof Player)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'权限不足');
-				break;
-			}
-			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
-			if($res===false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'领地不存在');
-				break;
-			}
-			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限修改这块领地');
-				break;
-			}
-			$res->resetPermission();
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'成功重置领地 '.$args[1].' 的权限数据');
-			break;
-		case 'set':
-			if(!isset($args[3]))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res set <领地> <权限索引> <true/false> ,权限索引见下表'.EOL.
-					'    move - 玩家移动权限'.EOL.
-					'    build - 破坏/放置权限'.EOL.
-					'    use - 使用工作台/箱子等权限'.EOL.
-					'    pvp - PVP权限'.EOL.
-					'    damage - 是否能受到伤害'.EOL.
-					'    healing - 是否自动回血'.EOL.
-					'    tp - 传送到此领地的权限'.EOL.
-					'    flow - 液体流动权限');
-				break;
-			}
-			if($args[1]=='spawn' && $sender instanceof Player)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'权限不足');
-				break;
-			}
-			$args[2]=strtolower($args[2]);
-			if(!in_array($args[2],$this->perms))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'错误的权限索引 ,只能为以下值的任意一个 :'.EOL.
-					'    move - 玩家移动权限'.EOL.
-					'    build - 破坏/放置权限'.EOL.
-					'    use - 使用工作台/箱子等权限'.EOL.
-					'    pvp - PVP权限'.EOL.
-					'    damage - 是否能受到伤害'.EOL.
-					'    healing - 是否自动回血'.EOL.
-					'    tp - 传送到此领地的权限'.EOL.
-					'    flow - 液体流动权限');
-				break;
-			}
-			$args[3]=strtolower($args[3]);
-			if($args[3]!='true' && $args[3]!='false')
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'错误的权限值 ,只能为以下值的任意一个 :'.EOL.
-					'    true - 开放此权限'.EOL.
-					'    false - 阻止此权限');
-				break;
-			}
-			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
-			if($res===false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'领地不存在');
-				break;
-			}
-			if(!$sender->isOp () && $res->getOwner()!==strtolower($sender->getName()))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限修改这块领地');
-				break;
-			}
-			$res->setPermission($args[2],$args[3]);
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'成功设置领地 '.$args[1].' 的权限 '.$args[2]);
-			break;
-		case 'pset':
-			if(!isset($args[4]))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res pset <领地> <玩家> <权限索引> <true/false> 权限索引见下表'.EOL.
-					'    move - 玩家移动权限'.EOL.
-					'    build - 破坏/放置权限'.EOL.
-					'    use - 使用工作台/箱子等权限'.EOL.
-					'    pvp - PVP权限'.EOL.
-					'    tp - 传送到此领地的权限');
-				break;
-			}
-			if($args[1]=='spawn' && $sender instanceof Player)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'权限不足');
-				break;
-			}
-			$args[2]=strtolower($args[2]);
-			if($args[2]=='' || preg_match('#^[a-zA-Z0-9_]{3,16}$#', $args[2])==0)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'无效的用户名');
-				break;
-			}
-			$args[3]=strtolower($args[3]);
-			if($args[3]!='move' && $args[3]!='build' && $args[3]!='use' && $args[3]!='pvp' && $args[3]!='tp')
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'错误的权限索引 ,只能为以下值的任意一个 :'.EOL.
-					'    move - 玩家移动权限'.EOL.
-					'    build - 破坏/放置权限'.EOL.
-					'    use - 使用工作台/箱子等权限'.EOL.
-					'    pvp - PVP权限'.EOL.
-					'    tp - 传送到此领地的权限');
-				break;
-			}
-			$args[4]=strtolower($args[4]);
-			if($args[4]!='true' && $args[4]!='false' && $args[4]!='remove')
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'错误的权限值 ,只能为以下值的任意一个 :'.EOL.TextFormat::RED.'true - 开放此权限'.EOL.TextFormat::RED.'false - 只有你自己能使用这个权限');
-				break;
-			}
-			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
-			if($res===false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'领地不存在');
-				break;
-			}
-			if(!$sender->isOp() && $res->getOwner()!==strtolower($sender->getName()))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限修改这块领地');
-				break;
-			}
-			$res->setPlayerPermission($args[2],$args[3],$args[4]);
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'成功设置玩家 '.$args[2].' 的领地权限 '.$args[3]);
-			break;
-		case 'tp':
-			if(!isset($args[1]))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res tp <领地>');
-				break;
-			}
-			if(!$sender instanceof Player)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'请在游戏中执行这个指令');
-				break;
-			}
-			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
-			if($res===false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'领地不存在');
-				break;
-			}
-			if(!$sender->isOp() && $res->getOwner()!==strtolower($sender->getName()) && !$res->getPlayerPermission($sender->getName(),'tp'))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限传送到这块领地');
-				break;
-			}
-			if(($pos=$res->getTeleportPos())===false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'传送失败,目标领地所在世界未加载');
-				break;
-			}
-			$sender->teleport($pos);
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'传送到领地 '.$args[1]);
-			break;
-		case 'tpset':
-			if(!$sender instanceof Player)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'请在游戏中执行这个指令');
-				break;
-			}
-			$res=$this->provider->getResidence($this->provider->queryResidenceByPosition($sender));
-			if($res===false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'这个位置没有领地');
-				break;
-			}
-			if(!$sender->isOp() && $res->getOwner()!==strtolower($sender->getName()))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限修改该领地的传送点');
-				break;
-			}
-			$res->setTeleportPos($sender);
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'领地 '.$res->getName().' 的传送点修改成功');
-			break;
+		
 		case 'wl':
 		case 'whitelist':
 			if(!$sender->isOp())
 			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限进行此操作');
+				$sender->sendRedMessage('你没有权限进行此操作');
 				break;
 			}
 			if(!isset($args[1]))
@@ -742,11 +376,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				$args[2]=strtolower($args[2]);
 				if(in_array($args[2],$this->whiteListWorld))
 				{
-					$sender->sendMessage('[FResidence] '.TextFormat::RED.'该世界已在白名单列表中');
+					$sender->sendRedMessage('该世界已在白名单列表中');
 					break;
 				}
 				$this->whiteListWorld[]=$args[2];
-				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'白名单世界添加成功');
+				$sender->sendGreenMessage('白名单世界添加成功');
 				break;
 			case 'remove':
 				if(!isset($args[2]))
@@ -757,7 +391,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				$args[2]=strtolower($args[2]);
 				if(!in_array($args[2],$this->whiteListWorld))
 				{
-					$sender->sendMessage('[FResidence] '.TextFormat::RED.'该世界不在白名单列表中');
+					$sender->sendRedMessage('该世界不在白名单列表中');
 					break;
 				}
 				$data=$this->whiteListWorld;
@@ -771,7 +405,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					unset($d);
 				}
 				unset($data);
-				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'白名单世界移除成功');
+				$sender->sendGreenMessage('白名单世界移除成功');
 				break;
 			case 'list':
 				$data=TextFormat::GREEN.'====='.TextFormat::YELLOW.'WhiteList Worlds'.TextFormat::GREEN.'=====';
@@ -785,7 +419,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				break;
 			case 'clear':
 				$this->whiteListWorld=array();
-				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'白名单世界清空成功');
+				$sender->sendGreenMessage('白名单世界清空成功');
 				break;
 			default:
 				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res whitelist [add <世界名>|remove <世界名>|list|clear]');
@@ -794,182 +428,528 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			$this->config->set('whiteListWorld',$this->whiteListWorld);
 			$this->config->save();
 			break;
-		case 'mirror':
-			if(!isset($args[2]))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res mirror <源领地> <目标领地>');
-				break;
-			}
-			$srcRes=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
-			$dstRes=$this->provider->getResidence($this->provider->queryResidenceByName($args[2]));
-			if($srcRes===false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'源领地不存在');
-				break;
-			}
-			if($dstRes===false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'目标领地不存在');
-				break;
-			}
-			if(!$sender->isOp())
-			{
-				if($srcRes->getOwner()!==strtolower($sender->getName()))
-				{
-					$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限修改源领地');
-					break;
-				}
-				
-				if($dstRes->getOwner()!==strtolower($sender->getName()))
-				{
-					$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限修改目标领地');
-					break;
-				}
-			}
-			$dstRes->setAllPermission($srcRes->getAllPermission());
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'领地权限数据复制成功');
-			break;
-		case 'rename':
-			if(!isset($args[2]))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res rename <领地> <名称>');
-				break;
-			}
-			if(strlen($args[2])<=0 || strlen($args[2])>=60)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'领地名称无效');
-				break;
-			}
-			$res=$this->provider->getResidence($this->provider->queryResidenceByName($args[1]));
-			if($res===false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'领地不存在');
-				break;
-			}
-			if(!$sender->isOp() && $res->getOwner()!==strtolower($sender->getName()))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'你没有权限修改这块领地');
-				break;
-			}
-			$rid=$this->provider->queryResidenceByName($args[2]);
-			if($rid!==false && $this->provider->getResidence($rid)!==false)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'已存在重名领地');
-				break;
-			}
-			$res->setName($args[2]);
-			$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'领地重命名成功');
-			break;
-		case 'select':
-			if(!$sender instanceof Player)
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::RED.'请在游戏中执行这个指令');
-				break;
-			}
-			switch(isset($args[1])?$args[1]:'')
-			{
-			case 'size':
-				if(!isset($this->players[$sender->getName()]) || !$this->players[$sender->getName()]->isSelectFinish())
-				{
-					$sender->sendMessage('[FResidence] '.TextFormat::RED.'请先选择两个点再进行此操作');
-					break;
-				}
-				$p1=$this->players[$sender->getName()]->getP1();
-				$p2=$this->players[$sender->getName()]->getP2();
-				$size=Utils::calucateSize($p1,$p2);
-				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'当前选区信息:'.EOL.
-					'    选区大小: '.TextFormat::YELLOW.$size.' 方块'.EOL.
-					'    选区价格: '.TextFormat::YELLOW.($this->moneyPerBlock*$size).' '.$this->moneyName.EOL.
-					'    选区坐标: '.TextFormat::YELLOW.'('.$p1->getX().','.$p1->getY().','.$p1->getZ().')->('.$p2->getX().','.$p2->getY().','.$p2->getZ().')');
-				unset($p1,$p2);
-				break;
-			case 'chunk':
-				$this->players[$sender->getName()]->setPos1(new Position(($sender->getX()>>4)*16,0,($sender->getZ()>>4)*16,$sender->getLevel()));
-				$this->players[$sender->getName()]->setPos2(new Position(($sender->getX()>>4)*16+16,128,($sender->getZ()>>4)*16+16,$sender->getLevel()));
-				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'已选中当前所在区块 ,使用 /res select size 查看选区价格');
-				break;
-			case 'vert':
-				if(!isset($this->players[$sender->getName()]) || !$this->players[$sender->getName()]->isSelectFinish())
-				{
-					$sender->sendMessage('[FResidence] '.TextFormat::RED.'请先选择两个点再进行此操作');
-					break;
-				}
-				$this->players[$sender->getName()]->p1->y=0;
-				$this->players[$sender->getName()]->p2->y=128;
-				$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'已将选区Y坐标扩展到0-128格 ,使用 /res select size 查看选区价格');
-				break;
-			default:
-				if(isset($args[3]))
-				{
-					$p1=$sender->getPosition();
-					$p1->x=intval($p1->getX()+$args[1]);
-					$p1->y=min(max(intval($p1->getY()+$args[2]),0),128);
-					$p1->z=intval($p1->getZ()+$args[3]);
-					$p2=$sender->getPosition();
-					$p2->x=intval($p2->getX()+$args[1]);
-					$p2->y=min(max(intval($p2->getY()+$args[2]),0),128);
-					$p2->z=intval($p2->getZ()+$args[3]);
-					$this->players[$sender->getName()]->setPos1($p1);
-					$this->players[$sender->getName()]->setPos2($p2);
-					unset($p1,$p2);
-					$sender->sendMessage('[FResidence] '.TextFormat::GREEN.'已选中以当前坐标为中心的指定范围 ,使用 /res select size 查看选区价格');
-				}
-				else
-				{
-					$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res select <size|chunk|vert> 或 /res select <x> <y> <z>');
-				}
-				break;
-			}
-			break;
-		case 'help':
-		case '？':
-		case '?':
-			if(isset($args[1]))
-			{
-				$page=(int)$args[1];
-			}
-			else
-			{
-				$page=1;
-			}
-			$help='';
-			switch($page)
-			{
-			default:
-				$page=1;
-			case 1:
-				$help.='/res create <名称> - 创建一个领地'.EOL;
-				$help.='/res remove <名称> - 移除指定名称的领地'.EOL;
-				$help.=TextFormat::RED.'/res removeall '.($sender instanceof Player?'':'<玩家ID> ').'- 移除'.($sender instanceof Player?'你':'某玩家').'的所有领地'.EOL;
-				$help.='/res message <领地> <索引> <内容> - 设置领地的消息内容'.EOL;
-				$help.='/res set <领地> <权限> <true/false> - 设置领地权限'.EOL;
-				break;
-			case 2:
-				$help.='/res pset <领地> <玩家> <权限> <true/false> - 设置某玩家的领地权限'.EOL;
-				$help.='/res give <领地> <玩家> - 把领地赠送给某玩家'.EOL;
-				$help.='/res tp <领地> - 传送到某领地'.EOL;
-				$help.='/res tpset - 设置当前坐标为当前领地传送点'.EOL;
-				$help.='/res help - 查看帮助'.EOL;
-				break;
-			case 3:
-				$help.='/res info <领地> - 查询指定领地信息'.EOL;
-				$help.='/res current - 查询当前所在领地信息'.EOL;
-				$help.='/res whitelist [add <世界名>|remove <世界名>|list|clear] - 操作白名单世界'.EOL;
-				$help.='/res mirror <源领地> <目标领地> - 将源领地的权限数据复制到目标领地'.EOL;
-				$help.='/res rename <领地> <名字> - 重命名领地'.EOL;
-				$help.='/res select <size|chunk|vert> - 查看选区大小/选取整个区块/扩展选区Y坐标到0-128'.EOL;
-				$help.='/res select <x> <y> <z> - 选择以当前坐标为起点 ,指定大小的选区'.EOL;
-				break;
-			}
-			$help='=====FResidence commands ['.$page.'/3]====='.EOL.$help;
-			$sender->sendMessage($help);
-			break;
-		default:
-			$sender->sendMessage('[FResidence] '.TextFormat::RED.'请使用 /res help 查看帮助');
-			break;
-		}
-		unset($sender,$command,$label,$help,$rid,$res,$resarr,$break,$select1,$select2,$level,$args);
+		}*/
+		unset($sender,$command,$label,$args);
 		return true;
+	}
+	
+	public function onResidenceCommand($sender,array $args,$granted=false)
+	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
+		if(!isset(self::$_RES_COMMAND_HELP[$args[0]]))
+		{
+			$sender->sendMessage(Utils::getRedString('未知指令,请使用 /res help 查看帮助'));
+		}
+		else if(!isset($args[self::$_RES_COMMAND_HELP[$args[0]][0]]))
+		{
+			$sender->sendMessage(Utils::getAquaString('使用方法: '.self::$_RES_COMMAND_HELP[$args[0]][1]));
+		}
+		else if($args[0]=='help' || $args[0]=='version' || ($sender instanceof Player && isset($this->players[$sender->getId()])))
+		{
+			if($sender instanceof Player)
+			{
+				$sender=$this->getPlayer($sender);
+			}
+			switch($args[0])
+			{
+			case 'select':
+				switch(strtolower($args[1]))
+				{
+				case 'size':
+					if(!$sender->isSelectFinish())
+					{
+						$sender->sendRedMessage('请先选择领地范围再执行此命令');
+						break;
+					}
+					if(($size=$sender->validateSelect())<2*2*2)
+					{
+						$sender->sendRedMessage('选区无效,请确保你选择的两个点在同一个世界内并且选区大于2x2x2');
+						unset($size);
+						break;
+					}
+					$pos1=$sender->getPos1();
+					$pos2=$sender->getPos2();
+					$sender->sendGreenMessage(implode("\n    ".TextFormat::GREEN,array(
+						'当前选区信息:',
+						'大小: '.TextFormat::YELLOW.$size.' 方块',
+						'价格: '.TextFormat::YELLOW.(Economy::$MoneyPerBlock*$size).' '.Economy::$MoneyName,
+						'坐标: '.TextFormat::YELLOW.'('.$pos1->getX().','.$pos1->getY().','.$pos1->getZ().')->('.$pos2->getX().','.$pos2->getY().','.$pos2->getZ().')')));
+					unset($size,$pos1,$pos2);
+					break;
+				case 'chunk':
+					$sender->setPos1(new Position(($sender->getX()>>4)*16,0,($sender->getZ()>>4)*16,$sender->getLevel()))
+						->setPos2(new Position(($sender->getX()>>4)*16+16,256,($sender->getZ()>>4)*16+16,$sender->getLevel()))
+						->sendGreenMessage('已选中当前所在区块')->validateSelect(true);
+					break;
+				case 'vert':
+					if(!$sender->isSelectFinish())
+					{
+						$sender->sendRedMessage('请先选择两个点再执行此命令');
+						break;
+					}
+					$sender->getPos1()->y=0;
+					$sender->getPos2()->y=256;
+					$sender->sendGreenMessage('已将选区Y坐标扩展到0-256格')->validateSelect(true);
+					break;
+				default:
+					if(isset($args[3]))
+					{
+						$offset=new Vector3(...array_map(function($val)
+						{
+							return abs(intval($val));
+						},array_slice($args,1)));
+						$sender->setPos1(Position::fromObject($sender->add($offset),$sender->getLevel()))->setPos2(Position::fromObject($sender->add($offset->multiply(-1)),$sender->getLevel()))->validateSelect(true);
+						unset($offset);
+					}
+					else
+					{
+						$sender->sendAquaMessage('使用方法: '.self::$_RES_COMMAND_HELP[$args[0]][1]);
+					}
+					break;
+				}
+				break;
+			case 'create':
+				if(!$sender->isSelectFinish())
+				{
+					$sender->sendRedMessage('请先选择领地范围再创建领地');
+					break;
+				}
+				if(strlen($args[1])<=0 || strlen($args[1])>=60)
+				{
+					$sender->sendRedMessage('无效领地名称');
+					break;
+				}
+				if(!$granted && count($this->provider->getResidencesByOwner($sender->getName()))>=$this->maxResidenceCount)
+				{
+					$sender->sendYellowMessage('你的领地数量已经达到了上限 '.$this->maxResidenceCount.' 块');
+					break;
+				}
+				if($this->provider->getResidenceByName($args[1])!==null)
+				{
+					$sender->sendRedMessage('已存在重名领地');
+					break;
+				}
+				if(($money=$sender->validateSelect())<2*2*2)
+				{
+					$sender->sendRedMessage('选区无效,请确保你选择的两个点在同一个世界内并且选区大于2x2x2');
+					break;
+				}
+				$money*=$granted?0:Economy::$MoneyPerBlock;
+				if($money>Economy::getMoney($sender))
+				{
+					$sender->sendRedMessage('你没有足够的钱来圈地 ,需要 '.$money.' '.Economy::$MoneyName);
+					break;
+				}
+				$pos1=$sender->getPos1();
+				$pos2=$sender->getPos2();
+				$conflict=0;
+				foreach($this->provider->getAllResidences() as $res)
+				{
+					if($res->getLevelName()==strtolower($pos1->getLevel()->getFolderName()) && $this->check($res->getPos1(),$res->getPos2(),$pos1,$pos2))
+					{
+						$sender->sendYellowMessage('选区与领地 '.$res->getName().' 重叠');
+						$conflict++;
+					}
+					unset($res);
+				}
+				if($conflict>0)
+				{
+					$sender->sendRedMessage('选区与 '.$conflict.' 块领地重叠 ,操作失败');
+					unset($pos1,$pos2,$conflict);
+					break;
+				}
+				$this->getServer()->getPluginManager()->callEvent($ev=new ResidenceAddEvent($this,$money,$sender->getPos1(),$sender->getPos2(),$args[1],$sender));
+				if(!$ev->isCancelled())
+				{
+					$this->provider->addResidence($ev->getPos1(),$ev->getPos2(),$sender,$ev->getResName());
+					Economy::reduceMoney($sender,$ev->getMoney());
+					$sender->setPos1(null)->setPos2(null);
+					$sender->sendGreenMessage('领地创建成功 ,花费 '.$money.' '.Economy::$MoneyName);
+				}
+				unset($pos1,$pos2,$conflict,$ev);
+				break;
+			case 'remove':
+				if(($res=$this->provider->getResidenceByName($args[1]))===null)
+				{
+					$sender->sendRedMessage('领地不存在');
+					break;
+				}
+				if(!$granted && !$res->isOwner($sender))
+				{
+					$sender->sendRedMessage('你没有权限移除这块领地');
+					break;
+				}
+				$this->getServer()->getPluginManager()->callEvent($ev=new ResidenceRemoveEvent($this,$res));
+				if(!$ev->isCancelled())
+				{
+					$this->provider->removeResidence($res);
+					$sender->sendGreenMessage('领地 '.$res->getName().' 移除成功');
+				}
+				break;
+			case 'removeall':
+				$sender->addConfirm('default',$code=mt_rand(1000,9999),'removeall')->sendYellowMessage('您正在进行一个危险操作(删除自己的所有领地),请使用 /res confirm '.$code.' 继续此操作,一分钟内有效');
+				unset($code);
+				break;
+			
+			case 'current':
+				if(($res=$this->provider->getResidenceByPosition($sender))===null)
+				{
+					$sender->sendColorMessage('当前位置没有领地');
+					break;
+				}
+				$sender->sendAquaMessage('您当前在 '.($res->getOwner()==''?'(服务器)':$res->getOwner()).' 的领地 '.$res->getName().' 上');
+				break;
+			case 'info':
+				if(($res=isset($args[1])?$this->provider->getResidenceByName($args[1]):$this->provider->getResidenceByPosition($sender))===null)
+				{
+					$sender->sendRedMessage(isset($args[1])?'不存在名称为 '.$args[1].' 的领地':'当前位置没有领地');
+					break;
+				}
+				$sender->sendGreenMessage(implode("\n    ".TextFormat::GREEN,array(
+					'领地信息查询结果:',
+					'名称: '.TextFormat::YELLOW.$res->getName(),
+					'主人: '.TextFormat::YELLOW.($res->getOwner()==''?'(服务器)':$res->getOwner()),
+					'大小: '.TextFormat::YELLOW.$res->getSize().' 方块')));
+				break;
+			case 'list':
+				$res=$this->provider->getResidencesByOwner($sender);
+				if(count($res)<=0)
+				{
+					$sender->sendYellowMessage('没有查询到任何领地');
+					break;
+				}
+				$sender->sendMessage(Utils::makeList('领地列表',$res,$args[1],($sender instanceof Player || $sender instanceof PlayerInfo)?5:50,function($val)
+				{
+					return is_string($val)?$val:(TextFormat::DARK_GREEN.$val->getName().TextFormat::WHITE.' - 世界:'.$val->getLevelName().',大小:'.$val->getSize().' 方块');
+				}));
+				break;
+			case 'version':
+				$sender->sendMessage(implode("\n".TextFormat::WHITE,array(
+					'--- FResidence ---',
+					'版本: '.TextFormat::DARK_GREEN.$this->getDescription()->getVersion(),
+					'作者: '.TextFormat::DARK_GREEN.'FENGberd',
+					'E-Mail: '.TextFormat::DARK_GREEN.'fengberd@gmail.com')));
+				break;
+			case 'help':
+				$sender->sendMessage(Utils::makeList('FResidence Help',self::$_RES_COMMAND_HELP,$args[1],($sender instanceof Player || $sender instanceof PlayerInfo)?5:50));
+				break;
+			case 'confirm':
+				if(($confirm=$player->getConfirm('default',$args[1]))!==null)
+				{
+					switch($confirm[0])
+					{
+					case 'removeall':
+						$sender->sendGreenMessage('成功移除你的所有领地 (操作 '.$this->provider->removeResidencesByOwner($sender).' 块领地)');
+						break;
+					}
+				}
+				break;
+			
+			case 'pset':
+				if(!Utils::validatePlayerName($args[2]=Utils::getPlayerName($args[2])))
+				{
+					$sender->sendRedMessage('无效的用户名');
+					break;
+				}
+				if(!Permissions::validatePlayerIndex($args[3]=strtolower($args[3])))
+				{
+					$sender->sendRedMessage(implode("\n    ".TextFormat::WHITE,array(
+						'错误的权限索引 ,只能为以下值的任意一个 :',
+						Permissions::PERMISSION_USE.' - 使用工作台/箱子等',
+						Permissions::PERMISSION_MOVE.' - 玩家移动(关闭后其他玩家不能进入领地)',
+						Permissions::PERMISSION_BUILD.' - 破坏/放置方块',
+						Permissions::PERMISSION_TELEPORT.' - 传送到领地')));
+					break;
+				}
+				if(($res=$this->provider->getResidenceByName($args[1]))===null)
+				{
+					$sender->sendRedMessage('领地不存在');
+					break;
+				}
+				if(!$granted && !$res->isOwner($sender))
+				{
+					$sender->sendRedMessage('你没有权限修改这块领地的权限');
+					break;
+				}
+				$res->getPermissions()->setPlayerPermission($args[2],$args[3],$args[4]=Utils::parseBool($args[4]));
+				$sender->sendGreenMessage('成功设置玩家 '.$args[2].' 在领地 '.$res->getName().' 的权限 '.$args[3].' 为 '.($args[4]?'开启':'关闭'));
+				break;
+			case 'set':
+				if(!Permissions::validateIndex($args[2]=strtolower($args[2])))
+				{
+					$sender->sendRedMessage(implode("\n    ".TextFormat::WHITE,array(
+						'错误的权限索引 ,只能为以下值的任意一个 :',
+						Permissions::PERMISSION_USE.' - 使用工作台/箱子等',
+						Permissions::PERMISSION_MOVE.' - 玩家移动(关闭后其他玩家不能进入领地)',
+						Permissions::PERMISSION_BUILD.' - 破坏/放置方块',
+						Permissions::PERMISSION_TELEPORT.' - 传送到领地',
+						Permissions::PERMISSION_PVP.' - 玩家互相PVP',
+						Permissions::PERMISSION_FLOW.' - 液体流动',
+						Permissions::PERMISSION_DAMAGE.' - 造成伤害',
+						Permissions::PERMISSION_HEALING.' - 自动回血')));
+					break;
+				}
+				if(($res=$this->provider->getResidenceByName($args[1]))===null)
+				{
+					$sender->sendRedMessage('领地不存在');
+					break;
+				}
+				if(!$granted && !$res->isOwner($sender))
+				{
+					$sender->sendRedMessage('你没有权限修改这块领地的权限');
+					break;
+				}
+				$res->getPermissions()->setPermission($args[2],$args[3]=Utils::parseBool($args[3]));
+				$sender->sendGreenMessage('成功设置领地 '.$res->getName().' 的权限 '.$args[2].' 为 '.($args[3]?'开启':'关闭'));
+				break;
+			
+			case 'default':
+				if(($res=$this->provider->getResidenceByName($args[1]))===null)
+				{
+					$sender->sendRedMessage('领地不存在');
+					break;
+				}
+				if(!$granted && !$res->isOwner($sender))
+				{
+					$sender->sendRedMessage('你没有权限修改这块领地的权限');
+					break;
+				}
+				$res->getPermissions()->resetPermissions();
+				$sender->sendGreenMessage('成功重置领地 '.$res->getName().' 的权限数据');
+				break;
+			case 'give':
+				if(!Utils::validatePlayerName($args[2]=Utils::getPlayerName($args[2])))
+				{
+					$sender->sendRedMessage('无效的用户名');
+					break;
+				}
+				if(($res=$this->provider->getResidenceByName($args[1]))===null)
+				{
+					$sender->sendRedMessage('领地不存在');
+					break;
+				}
+				if(!$granted && !$res->isOwner($sender))
+				{
+					$sender->sendRedMessage('你没有权限赠送这块领地');
+					break;
+				}
+				$res->setOwner($args[2]);
+				$sender->sendGreenMessage('成功把领地 '.$res->getName().' 赠送给玩家 '.$args[2]);
+				break;
+			case 'message':
+				if(!Messages::validateIndex($args[2]=strtolower($args[2])))
+				{
+					$sender->sendRedMessage(implode("\n    ".TextFormat::WHITE,array(
+						'错误的消息索引 ,只能为以下值的任意一个 :',
+						Messages::INDEX_ENTER.' - 进入领地的提示',
+						Messages::INDEX_LEAVE.' - 离开领地的提示',
+						Messages::INDEX_PERMISSION.' - 没有权限使用领地的提示')));
+					break;
+				}
+				;
+				if(($res=$this->provider->getResidenceByName($args[1]))===null)
+				{
+					$sender->sendRedMessage('领地不存在');
+					break;
+				}
+				if(!$granted && !$res->isOwner($sender))
+				{
+					$sender->sendRedMessage('你没有权限修改这块领地的消息');
+					break;
+				}
+				$res->getMessages()->setMessage($args[2],isset($args[3]) && $args[3]!=''?implode(' ',array_slice($args,3)):'');
+				$sender->sendGreenMessage('成功'.(isset($args[3]) && $args[3]!=''?'设置':'清除').'领地 '.$res->getName().' 的 '.$args[2].' 消息数据');
+				break;
+			case 'mirror':
+				if(($res=$this->provider->getResidenceByName($args[1]))===null)
+				{
+					$sender->sendRedMessage('源领地不存在');
+					break;
+				}
+				if(!$res->isOwner($sender))
+				{
+					$sender->sendRedMessage('你不是源领地的主人,无法读取权限数据');
+					break;
+				}
+				if(($dstRes=$this->provider->getResidenceByName($args[2]))===null)
+				{
+					$sender->sendRedMessage('目标领地不存在');
+					unset($dstRes);
+					break;
+				}
+				if(!$dstRes->isOwner($dstRes))
+				{
+					$sender->sendRedMessage('你没有权限修改目标领地的权限');
+					unset($dstRes);
+					break;
+				}
+				$dstRes->setPermissions(new Permissions($res->getPermissions()->getRawData(),$dstRes));
+				$sender->sendGreenMessage('成功将领地 '.$res->getName().' 的权限数据复制到领地 '.$dstRes->getName());
+				unset($dstRes);
+				break;
+			case 'rename':
+				if(strlen($args[2])<=0 || strlen($args[2])>=60)
+				{
+					$sender->sendRedMessage('领地名称无效');
+					break;
+				}
+				if(($res=$this->provider->getResidenceByName($args[1]))===null)
+				{
+					$sender->sendRedMessage('领地不存在');
+					break;
+				}
+				if(!$granted && !$res->isOwner($sender))
+				{
+					$sender->sendRedMessage('你没有权限修改这块领地的名称');
+					break;
+				}
+				if($this->provider->getResidenceByName($args[2])!==null)
+				{
+					$sender->sendRedMessage('已存在重名领地');
+					break;
+				}
+				$sender->sendGreenMessage('成功将领地 '.$res->getName().' 重命名为 '.$args[2]);
+				$res->setName($args[2]);
+				break;
+			case 'tp':
+				if(($res=$this->provider->getResidenceByName($args[1]))===null)
+				{
+					$sender->sendRedMessage('领地不存在');
+					break;
+				}
+				if(!$granted && !$res->isOwner($sender) && !$res->hasPermission($sender,Permissions::PERMISSION_TELEPORT))
+				{
+					$sender->sendRedMessage('你没有权限传送到这块领地');
+					break;
+				}
+				$sender->teleport($res->getTeleportPos());
+				$sender->sendGreenMessage('正在传送到领地 '.$res->getName().' ...');
+				break;
+			case 'tpset':
+				if(($res=$this->provider->getResidenceByPosition($sender))===null)
+				{
+					$sender->sendRedMessage('当前位置没有领地');
+					break;
+				}
+				if(!$granted && !$res->isOwner($sender))
+				{
+					$sender->sendRedMessage('你没有权限修改这块领地的传送点');
+					break;
+				}
+				$res->setTeleportPos($sender->getPlayer());
+				$sender->sendGreenMessage('领地 '.$res->getName().' 的传送点修改成功');
+				break;
+			}
+		}
+		else
+		{
+			$sender->sendMessage(Utils::getRedString('这个指令只能在游戏中使用'));
+		}
+		unset($sender,$args);
+	}
+	
+	public function onResidenceAdminCommand($sender,array $args)
+	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
+		if(!isset(self::$_RESADMIN_COMMAND_HELP[$args[0]]))
+		{
+			$sender->sendMessage(Utils::getRedString('未知指令,请使用 /resadmin help 查看帮助'));
+		}
+		else if(!isset($args[self::$_RESADMIN_COMMAND_HELP[$args[0]][0]]))
+		{
+			$sender->sendMessage(Utils::getAquaString('使用方法: '.self::$_RESADMIN_COMMAND_HELP[$args[0]][1]));
+		}
+		else
+		{
+			switch(isset($args[0])?$args[0]:'help')
+			{
+			case 'list':
+				$res=$this->provider->getResidencesByOwner($args[1]);
+				if(count($res)<=0)
+				{
+					$sender->sendMessage(Utils::getYellowString('没有查询到任何领地'));
+					break;
+				}
+				$sender->sendMessage(Utils::makeList('玩家 '.$args[1].' 的领地列表',$res,$args[2],($sender instanceof Player || $sender instanceof PlayerInfo)?5:50,function($val)
+				{
+					return is_string($val)?$val:(TextFormat::DARK_GREEN.$val->getName().TextFormat::WHITE.' - 世界:'.$val->getLevelName().',大小:'.$val->getSize().' 方块');
+				}));
+				break;
+			case 'listall':
+				$res=$this->provider->getAllResidences();
+				if(count($res)<=0)
+				{
+					$sender->sendMessage(Utils::getYellowString('没有查询到任何领地'));
+					break;
+				}
+				$sender->sendMessage(Utils::makeList('服务器领地列表',$res,$args[2],($sender instanceof Player || $sender instanceof PlayerInfo)?5:50,function($val)
+				{
+					return is_string($val)?$val:(TextFormat::DARK_GREEN.$val->getName().TextFormat::WHITE.' - 世界:'.$val->getLevelName().',大小:'.$val->getSize().' 方块');
+				}));
+				break;
+			case 'removeall':
+				$sender->sendMessage(Utils::getGreenString('成功移除玩家 '.TextFormat::AQUA.$args[1].TextFormat::GREEN.' 的所有领地 (操作 '.$this->provider->removeResidencesByOwner($args[1]).' 块领地)'));
+				break;
+			case 'setowner':
+				if(!Utils::validatePlayerName($args[2]=Utils::getPlayerName($args[2])))
+				{
+					$sender->sendMessage(Utils::getGreenString('无效的用户名'));
+					break;
+				}
+				if(($res=$this->provider->getResidenceByName($args[1]))===null)
+				{
+					$sender->sendMessage(Utils::getGreenString('领地不存在'));
+					break;
+				}
+				$res->setOwner($args[2]);
+				$sender->sendMessage(Utils::getGreenString('成功把领地 '.$res->getName().' 的主人设置为 '.$args[2]));
+				break;
+			case 'server':
+				if(($res=$this->provider->getResidenceByName($args[1]))===null)
+				{
+					$sender->sendMessage(Utils::getRedString('领地不存在'));
+					break;
+				}
+				$res->setOwner('');
+				$sender->sendMessage(Utils::getGreenString('成功把领地 '.$res->getName().' 设为服务器领地'));
+				break;
+			
+			case 'reload':
+				$this->loadConfig();
+				$sender->sendMessage(Utils::getGreenString('重载完成'));
+				break;
+			case 'parse':
+				if(!($sender instanceof \pocketmine\command\ConsoleCommandSender))
+				{
+					$sender->sendMessage(Utils::getRedString('这个指令只能在服务器后台使用'));
+					break;
+				}
+				$sender->sendMessage(Utils::getAquaString('开始转换领地数据'));
+				$land=new Config($this->getDataFolder().'../EconomyLand/Land.yml',Config::YAML,array());
+				$cou=0;
+				foreach($land->getAll() as $l)
+				{
+					$this->provider->addResidence(new Vector3($l['startX'],0,$l['startZ']),new Vector3($l['endX'],256,$l['endZ']),$l['owner'],'parse_'.$l['ID'],$l['level']);
+					$cou++;
+					unset($l);
+				}
+				$sender->sendMessage(Utils::getGreenString('数据转换完成,共处理 '.$cou.' 块领地'));
+				break;
+			
+			case 'help':
+				$sender->sendMessage(Utils::makeList('FResidence Admin Help',self::$_RESADMIN_COMMAND_HELP,$args[1],($sender instanceof Player || $sender instanceof PlayerInfo)?5:50));
+				break;
+			}
+		}
+		unset($sender,$args);
 	}
 	
 	public function onPlayerInteract(PlayerInteractEvent $event)
@@ -981,12 +961,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		}
 		if($event->getAction()==PlayerInteractEvent::RIGHT_CLICK_BLOCK)
 		{
-			$player=$this->players[$event->getPlayer()->getName()];
+			$player=$this->getPlayer($event);
 			if(($res=$this->provider->getResidenceByPosition($event->getBlock()))!==null)
 			{
-				if(!$player->isOp() && $res->getOwner()!==Utils::getPlayerName($player) && ($this->isProtectBlock($event->getBlock()) || $this->isBlockedItem($event->getItem())) && !$res->hasPermission($event->getPlayer(),Permissions::PERMISSION_USE))
+				if(!$player->isOp() && !$res->isOwner($player) && ($this->isProtectBlock($event->getBlock()) || $this->isBlockedItem($event->getItem())) && !$res->hasPermission($player,Permissions::PERMISSION_USE))
 				{
-					$player->sendMessage($res->getMessage(Messages::INDEX_PERMISSION));
+					$player->sendColorMessage($res->getMessage(Messages::INDEX_PERMISSION));
 					$event->setCancelled();
 				}
 			}
@@ -994,14 +974,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			{
 				if($event->getItem()->getId()==$this->selectItem)
 				{
-					$player->setPos1($event->getBlock());
-					$player->sendMessage('[FResidence] '.TextFormat::YELLOW.'已设置第一个点');
-					$player->validateSelect($this->moneyPerBlock,$this->moneyName);
+					$player->setPos1($event->getBlock())->sendYellowMessage('已设置第一个点')->validateSelect(true);
 					$event->setCancelled();
 				}
 				else if(in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),$this->whiteListWorld) && !$player->isOp())
 				{
-					$player->sendMessage('[FResidence] '.TextFormat::YELLOW.'抱歉,当前世界需要先圈地才能进行建筑');
+					$player->sendYellowMessage('抱歉,当前世界需要先圈地才能进行建筑');
 					$event->setCancelled();
 				}
 			}
@@ -1017,7 +995,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
-		$player=$this->players[$event->getPlayer()->getName()];
+		$player=$this->getPlayer($event);
 		$player->checkMoveTick--;
 		$player->movementLog[]=$event->getFrom();
 		if(count($player->movementLog)>$player->checkMoveTick)
@@ -1032,14 +1010,18 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		$player->checkMoveTick=$this->checkMoveTick;
 		if(($res=$this->provider->getResidenceByPosition($event->getTo()))!==null)
 		{
-			if($res->getOwner()!==Utils::getPlayerName($player) && !$player->isOp() && !$res->hasPermission($player,Permissions::PERMISSION_MOVE))
+			if(!$res->isOwner($player) && !$player->isOp() && !$res->hasPermission($player,Permissions::PERMISSION_MOVE))
 			{
 				$player->teleport($player->movementLog[0]);
-				$player->sendTip($res->getMessage(Messages::INDEX_PERMISSION));
+				if(($msg=$res->getMessage(Messages::INDEX_PERMISSION))!='')
+				{
+					$player->sendTip($msg);
+				}
+				unset($msg);
 			}
-			else if(!$player->inResidence() || $player->getResidence()->getID()!==$res->getID())
+			else if(!$player->inResidence() || $player->getResidence()->getId()!=$res->getId())
 			{
-				$player->sendMessage(str_replace(array('%name','%owner'),array(
+				$player->sendColorMessage(str_replace(array('%name','%owner'),array(
 					$res->getName(),
 					$res->getOwner()),$res->getMessage(Messages::INDEX_ENTER)));
 				$player->setResidence($res);
@@ -1050,7 +1032,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			if($player->inResidence())
 			{
 				$res=$player->getResidence();
-				$player->sendMessage(str_replace(array('%name','%owner'),array(
+				$player->sendColorMessage(str_replace(array('%name','%owner'),array(
 					$res->getName(),
 					$res->getOwner()),$res->getMessage(Messages::INDEX_LEAVE)));
 				$player->setResidence(null);
@@ -1066,25 +1048,25 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
+		$player=$this->getPlayer($event->getPlayer());
 		if(($res=$this->provider->getResidenceByPosition($event->getBlock()))!==null)
 		{
-			$player=$this->players[$event->getPlayer()->getName()];
-			if($res->getOwner()!==Utils::getPlayerName($player) && !$res->hasPermission($player,Permissions::PERMISSION_BUILD) && !$player->isOp())
+			if(!$res->isOwner($player) && !$res->hasPermission($player,Permissions::PERMISSION_BUILD) && !$player->isOp())
 			{
-				$player->sendMessage($res->getMessage(Messages::INDEX_PERMISSION));
+				$player->sendColorMessage($res->getMessage(Messages::INDEX_PERMISSION));
 				$event->setCancelled();
 			}
 			unset($player);
 		}
 		else
 		{
-			if(in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),$this->whiteListWorld) && !$event->getPlayer()->isOp())
+			if(in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),$this->whiteListWorld) && !$player->isOp())
 			{
-				$event->getPlayer()->sendMessage('[FResidence] '.TextFormat::YELLOW.'抱歉,当前世界需要先圈地才能进行建筑');
+				$player->sendYellowMessage('抱歉,当前世界需要先圈地才能进行建筑');
 				$event->setCancelled();
 			}
 		}
-		unset($event,$res);
+		unset($event,$res,$player);
 	}
 	
 	public function onBlockBreak(\pocketmine\event\block\BlockBreakEvent $event)
@@ -1094,12 +1076,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
-		$player=$this->players[$event->getPlayer()->getName()];
-		if(($res=$this->provider->getResidenceByPosition($event->getBlock()))!==false)
+		$player=$this->getPlayer($event->getPlayer());
+		if(($res=$this->provider->getResidenceByPosition($event->getBlock()))!==null)
 		{
-			if($res->getOwner()!==Utils::getPlayerName($player) && !$res->hasPermission($player,Permissions::PERMISSION_BUILD) && !$player->isOp())
+			if(!$res->isOwner($player) && !$res->hasPermission($player,Permissions::PERMISSION_BUILD) && !$player->isOp())
 			{
-				$player->sendMessage($res->getMessage(Messages::INDEX_PERMISSION));
+				$player->sendColorMessage($res->getMessage(Messages::INDEX_PERMISSION));
 				$event->setCancelled();
 			}
 		}
@@ -1107,14 +1089,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			if($event->getItem()->getId()==$this->selectItem)
 			{
-				$player->setPos2($event->getBlock());
-				$player->sendMessage('[FResidence] 已设置第二个点');
-				$player->validateSelect($this->moneyPerBlock,$this->moneyName);
+				$player->setPos2($event->getBlock())->sendGreenMessage('已设置第二个点')->validateSelect(true);
 				$event->setCancelled();
 			}
 			else if(in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),$this->whiteListWorld) && !$player->isOp())
 			{
-				$player->sendMessage('[FResidence] '.TextFormat::YELLOW.'抱歉,当前世界需要先圈地才能进行建筑');
+				$player->sendYellowMessage('抱歉,当前世界需要先圈地才能进行建筑');
 				$event->setCancelled();
 			}
 		}
@@ -1152,7 +1132,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			if(($res!==null && !$res->getPermission(Permissions::PERMISSION_PVP)) || 
 				(($res=$this->provider->getResidenceByPosition($event->getDamager()))!==null && !$res->getPermission(Permissions::PERMISSION_PVP)))
 			{
-				$event->getDamager()->sendMessage($res->getMessage(Messages::INDEX_PERMISSION));
+				if(($msg=$res->getMessage(Messages::INDEX_PERMISSION))!='')
+				{
+					$event->getDamager()->sendMessage($msg);
+				}
+				unset($msg);
 				$event->setCancelled();
 			}
 		}
@@ -1166,7 +1150,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
-		$this->players[$event->getPlayer()->getName()]=new PlayerInfo($event->getPlayer());
+		$this->players[$event->getPlayer()->getId()]=new PlayerInfo($event->getPlayer());
 		unset($event);
 	}
 	
@@ -1177,12 +1161,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
-		$name=$event->getPlayer()->getName();
-		if(isset($this->players[$name]) && !$this->players[$name]->isConnected())
-		{
-			unset($this->players[$name]);
-		}
-		unset($event,$name);
+		unset($this->players[$event->getPlayer()->getId()],$event);
 	}
 	
 	public function isProtectBlock(Block $block)
@@ -1192,18 +1171,13 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
-		switch($block->getId())
+		if($block instanceof Blocks\Door || 
+			$block instanceof Blocks\Chest || 
+			$block instanceof Blocks\Trapdoor || 
+			$block instanceof Blocks\FenceGate || 
+			$block instanceof Blocks\WoodenButton || 
+			in_array($block->getId(),self::$protectedBlocks))
 		{
-		case Item::BED_BLOCK:
-		case Item::CHEST:
-		case Item::CRAFTING_TABLE:
-		case Item::DOOR_BLOCK:
-		case Item::IRON_DOOR_BLOCK:
-		case Item::TRAPDOOR:
-		case Item::FENCE_GATE:
-		case Item::STONECUTTER:
-		case Item::NETHER_REACTOR:
-		case 126:
 			unset($block);
 			return true;
 		}

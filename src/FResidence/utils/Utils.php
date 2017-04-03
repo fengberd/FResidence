@@ -2,12 +2,13 @@
 namespace FResidence\utils;
 
 use pocketmine\math\Vector3;
+use pocketmine\utils\TextFormat;
 
 class Utils
 {
 	const CONFIG_VERSION=2;
 	
-	public static function calucateSize($p1,$p2)
+	public static function calculateSize($p1,$p2)
 	{
 		return max(abs($p1->getX()-$p2->getX()),1)*max(abs($p1->getY()-$p2->getY()),1)*max(abs($p1->getZ()-$p2->getZ()),1);
 	}
@@ -22,7 +23,25 @@ class Utils
 		{
 			return strtolower($var->getName());
 		}
-		throw new \InvalidArgumentException('This function only accept string or IPlayer/PlayerInfo object.');
+		throw new \FResidence\exception\IllegalArgumentException('此函数只接受字符串或IPlayer/PlayerInfo对象');
+	}
+	
+	public static function validatePlayerName($val)
+	{
+		return preg_match('#^[a-zA-Z0-9_]{3,16}$#',$val)!=0;
+	}
+	
+	public static function makeList($title,$data,&$page,$itemPerPage,$callback=null)
+	{
+		$total=ceil(count($data)/$itemPerPage);
+		if(!isset($page) || ($page=intval($page))>$total || $page<1)
+		{
+			$page=1;
+		}
+		return implode("\n",array_map($callback===null?function($val)
+		{
+			return is_array($val)?(TextFormat::DARK_GREEN.$val[1].': '.TextFormat::WHITE.$val[2]):$val;
+		}:$callback,array_merge(array('--- '.$title.' ['.$page.'/'.$total.'] ---'),array_slice($data,($page-1)*$itemPerPage,$itemPerPage))));
 	}
 	
 	public static function parseBool($val)
@@ -45,7 +64,7 @@ class Utils
 	
 	public static function parsePosition(array $data,\pocketmine\level\Level $level)
 	{
-		return new Position($data['x'],$data['y'],$data['z'],$level);
+		return new \pocketmine\level\Position($data['x'],$data['y'],$data['z'],$level);
 	}
 	
 	public static function encodeVector3(Vector3 $data)
@@ -58,11 +77,11 @@ class Utils
 	
 	public static function updateConfig($version,$data)
 	{
-		if($version>CONFIG_VERSION)
+		if($version>self::CONFIG_VERSION)
 		{
-			throw new \Exception('您当前使用的FResidence版本过旧,无法读取领地数据,请更新插件至最新版!');
+			throw new \FResidence\exception\VersionException('您当前使用的FResidence版本过旧,无法读取领地数据,请更新插件至最新版!');
 		}
-		while($version<CONFIG_VERSION)
+		while($version<self::CONFIG_VERSION)
 		{
 			foreach($data as $key=>$val)
 			{
@@ -91,5 +110,30 @@ class Utils
 			$version++;
 		}
 		return $data;
+	}
+	
+	public static function getRedString($msg)
+	{
+		return self::getColoredString($msg,TextFormat::RED);
+	}
+	
+	public static function getAquaString($msg)
+	{
+		return self::getColoredString($msg,TextFormat::AQUA);
+	}
+	
+	public static function getGreenString($msg)
+	{
+		return self::getColoredString($msg,TextFormat::GREEN);
+	}
+	
+	public static function getYellowString($msg)
+	{
+		return self::getColoredString($msg,TextFormat::YELLOW);
+	}
+	
+	public static function getColoredString($msg,$color=TextFormat::WHITE)
+	{
+		return '[FResidence] '.$color.$msg;
 	}
 }
