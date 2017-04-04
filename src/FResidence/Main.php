@@ -1066,6 +1066,17 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		unset($event,$block,$res);
 	}
 	
+	public function onLevelLoad(\pocketmine\event\level\LevelLoadEvent $event)
+	{
+		ZXDA::isTrialVersion();
+		if(!ZXDA::isVerified())
+		{
+			return null;
+		}
+		$this->provider->reload();
+		unset($event);
+	}
+	
 	public function onEntityDamage(\pocketmine\event\entity\EntityDamageEvent $event)
 	{
 		ZXDA::isTrialVersion();
