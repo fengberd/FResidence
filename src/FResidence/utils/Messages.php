@@ -51,7 +51,7 @@ class Messages
 	{
 		if(!self::validateIndex($index=strtolower($index)))
 		{
-			throw new \FResidence\exception\InvalidArgumentException('无效消息索引,请使用 Messages::INDEX_XXX 常量');
+			throw new \FResidence\exception\IllegalArgumentException('无效消息索引,请使用 Messages::INDEX_XXX 常量');
 		}
 		return $index;
 	}

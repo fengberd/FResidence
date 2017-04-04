@@ -20,4 +20,5 @@ interface DataProvider
 	public function save();
 	public function close($save);
 	public function reload($save);
+	public function getName();
 }

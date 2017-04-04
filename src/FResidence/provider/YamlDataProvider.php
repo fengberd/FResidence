@@ -6,9 +6,7 @@ use pocketmine\utils\Config;
 use FResidence\utils\Utils;
 use FResidence\utils\Residence;
 
-use FResidence\exception\ResidenceInstantiationException;
-
-class YamlProvider implements DataProvider
+class YamlDataProvider implements DataProvider
 {
 	private $main=null;
 	private $config=null;
@@ -152,7 +150,6 @@ class YamlProvider implements DataProvider
 		{
 			$this->save();
 		}
-		@mkdir($this->main->getDataFolder());
 		$this->config=new Config($this->main->getDataFolder().'residence.yml',Config::YAML,array(
 			'DataVersion'=>Utils::CONFIG_VERSION,
 			'Residences'=>array()));
@@ -172,5 +169,10 @@ class YamlProvider implements DataProvider
 		}
 		$this->save();
 		unset($save);
+	}
+	
+	public function getName()
+	{
+		return 'Yaml';
 	}
 }

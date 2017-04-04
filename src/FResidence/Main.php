@@ -16,16 +16,19 @@ use pocketmine\utils\TextFormat;
 use pocketmine\event\player\PlayerInteractEvent;
 use pocketmine\event\entity\EntityRegainHealthEvent;
 
-use FResidence\event\ResidenceAddEvent;
-use FResidence\event\ResidenceRemoveEvent;
-
 use FResidence\utils\Utils;
 use FResidence\utils\Economy;
 use FResidence\utils\Messages;
 use FResidence\utils\PlayerInfo;
 use FResidence\utils\Permissions;
 
-use FResidence\provider\YamlProvider;
+use FResidence\provider as Providers;
+use FResidence\provider\ConfigProvider;
+
+use FResidence\event\ResidenceAddEvent;
+use FResidence\event\ResidenceRemoveEvent;
+
+use FResidence\exception\FResidenceException;
 
 class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Listener
 {
@@ -85,8 +88,8 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		// TODO: unstuck
 		);
 	private static $_RESADMIN_COMMAND_HELP=array(
-		'list'=>array(1,'/res list <玩家> [页码]','列出某玩家的所有领地'),
-		'listall'=>array(0,'/res listall','列出服务器上的所有领地'),
+		'list'=>array(1,'/resadmin list <玩家> [页码]','列出某玩家的所有领地'),
+		'listall'=>array(0,'/resadmin listall','列出服务器上的所有领地'),
 		
 		'removeall'=>array(1,'/resadmin removeall <玩家>','移除某玩家的所有领地'),
 		'setowner'=>array(2,'/resadmin setowner <领地> <玩家>','设置领地的主人'),
@@ -95,72 +98,45 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		'reload'=>array(0,'/resadmin reload','重载插件数据'),
 		'parse'=>array(0,'/resadmin parse','转换EconomyLand的数据到插件里,只有后台能使用'),
 		
-		'help'=>array(0,'/resadmin help [页码]','查看使用帮助'),
-		'confirm'=>array(1,'/res confirm <验证码>','确认执行危险操作'));
+		'help'=>array(0,'/resadmin help [页码]','查看使用帮助'));
 	
 	public static function getInstance()
 	{
 		return self::$obj;
 	}
 	
-	public $provider=null;
+	private $provider=null;
 	
-	public $players=array();
-	public $whiteListWorld=array();
+	private $players=array();
+	private $blackListWorld=array();
+	private $whiteListWorld=array();
 	
 	public function getProvider()
 	{
 		return $this->provider;
 	}
 	
-	public function loadConfig()
+	public function reload()
 	{
-		@mkdir($this->getDataFolder());
-		$this->config=new Config($this->getDataFolder().'config.yml',Config::YAML,array());
-		$this->moneyName=$this->config->get('MoneyName','元');
-		$this->selectItem=intval($this->config->get('SelectItem',Item::WOODEN_HOE));
-		$this->preferEconomy=$this->config->get('PreferEconomy','EconomyAPI');
-		$this->checkMoveTick=intval($this->config->get('CheckMoveTick',10));
-		$this->moneyPerBlock=$this->config->get('MoneyPerBlock',0.05)*1;
-		$this->maxResidenceCount=intval($this->config->get('MaxResidenceCount',3));
-		if($this->config->exists('landItem'))
-		{
-			$this->moneyName=$this->config->get('moneyName','元');
-			$this->selectItem=intval($this->config->get('landItem',Item::WOODEN_HOE));
-			$this->checkMoveTick=intval($this->config->get('checkMoveTick',10));
-			$this->moneyPerBlock=$this->config->get('blockMoney',0.05)*1;
-			$this->maxResidenceCount=intval($this->config->get('playerMaxCount',3));
-		}
-		foreach((array)$this->config->get('WhiteListWorld',array()) as $world)
-		{
-			$this->whiteListWorld[]=strtolower($world);
-			unset($world);
-		}
-		$this->config->setAll(array(
-			'Provider'=>'yaml',
-			'MoneyName'=>$this->moneyName,
-			'SelectItem'=>$this->selectItem,
-			'PreferEconomy'=>$this->preferEconomy,
-			'CheckMoveTick'=>$this->checkMoveTick,
-			'MoneyPerBlock'=>$this->moneyPerBlock,
-			'WhiteListWorld'=>$this->whiteListWorld,
-			'MaxResidenceCount'=>$this->maxResidenceCount));
-		$this->config->save();
+		ConfigProvider::init($this);
 		Permissions::init();
-		Economy::init($this->preferEconomy,$this->moneyName,$this->moneyPerBlock);
-		switch(strtolower($this->config->get('Provider')))
+		Economy::init(ConfigProvider::PreferEconomy());
+		switch(strtolower(ConfigProvider::Provider()))
 		{
 		/*case 'mysql':
 			break;
 		case 'sqlite3':
 			break;*/
 		default:
-			$this->getLogger()->warning('配置错误:不支持的Provider类型,已切换为Yaml模式');
+			$this->getLogger()->warning('Provider不受支持,已切换至Yaml模式');
 		case 'yaml':
-		case 'yml':
-			$this->provider=new YamlProvider($this);
+			$this->provider=new Providers\YamlDataProvider($this);
 			break;
 		}
+		ConfigProvider::Provider($this->provider->getName());
+		ConfigProvider::PreferEconomy(Economy::getApiName());
+		$this->getLogger()->notice('当前经济API:'.Economy::getApiName());
+		$this->getLogger()->notice('当前Provider:'.$this->provider->getName());
 	}
 	
 	public function onLoad()
@@ -198,9 +174,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		}
 		try
 		{
-			$this->loadConfig();
-			Item::addCreativeItem(Item::get($this->selectItem,0));
-			
+			$this->reload();
 			$this->getServer()->getScheduler()->scheduleRepeatingTask($this->systemTask=new SystemTask($this),20);
 			
 			$reflection=new \ReflectionClass(get_class($this));
@@ -220,7 +194,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				unset($method);
 			}
 		}
-		catch(\FResidence\exception\FResidenceException $e)
+		catch(FResidenceException $e)
 		{
 			$this->getLogger()->warning('初始化插件时出现错误: '.$e->getMessage().',即将关闭服务器');
 			$this->getServer()->forceShutdown();
@@ -298,61 +272,13 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				$this->onResidenceCommand($sender,$args);
 			}
 		}
-		catch(\FResidence\exception\FResidenceException $e)
+		catch(FResidenceException $e)
 		{
 			$sender->sendMessage(Utils::getRedString('无法完成操作: '.$e->getMessage()));
 		}
 		/*
 		switch(isset($args[0])?$args[0]:'help')
 		{
-		case 'listall':
-			if(!$sender->isOp())
-			{
-				$sender->sendRedMessage('你没有权限使用这个指令');
-				break;
-			}
-			if(!isset($args[1]))
-			{
-				$page=1;
-			}
-			else
-			{
-				$page=(int)$args[1];
-			}
-			if($page<=0)
-			{
-				$page=1;
-			}
-			$arr=$this->provider->getAllResidences();
-			if(count($arr)==0)
-			{
-				$sender->sendRedMessage('服务器里还没创建过任何领地');
-				break;
-			}
-			if(($page-1)*5>count($arr))
-			{
-				$sender->sendRedMessage('页码超出范围');
-				break;
-			}
-			$all=(int)(count($arr)/5);
-			if($all<=0)
-			{
-				$all=0;
-			}
-			$all++;
-			$help=TextFormat::GREEN.'====All Residences ['.$page.'/'.$all.']===='.EOL;
-			$page--;
-			foreach($arr as $key=>$res)
-			{
-				if($page*5<=$key && ($page+1)*5>$key)
-				{
-					$help.=TextFormat::YELLOW.$res->getName().' - 大小 '.$res->getSize().' 方块 ,所在世界 : '.$res->getLevel().EOL;
-				}
-				unset($res,$key);
-			}
-			$sender->sendMessage($help);
-			break;
-		
 		case 'wl':
 		case 'whitelist':
 			if(!$sender->isOp())
@@ -476,7 +402,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					$sender->sendGreenMessage(implode("\n    ".TextFormat::GREEN,array(
 						'当前选区信息:',
 						'大小: '.TextFormat::YELLOW.$size.' 方块',
-						'价格: '.TextFormat::YELLOW.(Economy::$MoneyPerBlock*$size).' '.Economy::$MoneyName,
+						'价格: '.TextFormat::YELLOW.(ConfigProvider::MoneyPerBlock()*$size).' '.ConfigProvider::MoneyName(),
 						'坐标: '.TextFormat::YELLOW.'('.$pos1->getX().','.$pos1->getY().','.$pos1->getZ().')->('.$pos2->getX().','.$pos2->getY().','.$pos2->getZ().')')));
 					unset($size,$pos1,$pos2);
 					break;
@@ -518,14 +444,19 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					$sender->sendRedMessage('请先选择领地范围再创建领地');
 					break;
 				}
+				if(!$granted && in_array(strtolower($sender->getPos1()->getLevel()->getFolderName()),ConfigProvider::BlackListWorld()))
+				{
+					$sender->sendRedMessage('当前世界不允许创建领地');
+					break;
+				}
 				if(strlen($args[1])<=0 || strlen($args[1])>=60)
 				{
 					$sender->sendRedMessage('无效领地名称');
 					break;
 				}
-				if(!$granted && count($this->provider->getResidencesByOwner($sender->getName()))>=$this->maxResidenceCount)
+				if(!$granted && count($this->provider->getResidencesByOwner($sender->getName()))>=ConfigProvider::MaxResidenceCount())
 				{
-					$sender->sendYellowMessage('你的领地数量已经达到了上限 '.$this->maxResidenceCount.' 块');
+					$sender->sendYellowMessage('你的领地数量已经达到了上限 '.ConfigProvider::MaxResidenceCount().' 块');
 					break;
 				}
 				if($this->provider->getResidenceByName($args[1])!==null)
@@ -541,7 +472,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				$money*=$granted?0:Economy::$MoneyPerBlock;
 				if($money>Economy::getMoney($sender))
 				{
-					$sender->sendRedMessage('你没有足够的钱来圈地 ,需要 '.$money.' '.Economy::$MoneyName);
+					$sender->sendRedMessage('你没有足够的钱来圈地 ,需要 '.$money.' '.ConfigProvider::MoneyName());
 					break;
 				}
 				$pos1=$sender->getPos1();
@@ -568,7 +499,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					$this->provider->addResidence($ev->getPos1(),$ev->getPos2(),$sender,$ev->getResName());
 					Economy::reduceMoney($sender,$ev->getMoney());
 					$sender->setPos1(null)->setPos2(null);
-					$sender->sendGreenMessage('领地创建成功 ,花费 '.$money.' '.Economy::$MoneyName);
+					$sender->sendGreenMessage('领地创建成功 ,花费 '.$money.' '.ConfigProvider::MoneyName());
 				}
 				unset($pos1,$pos2,$conflict,$ev);
 				break;
@@ -859,13 +790,17 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			return null;
 		}
-		if(!isset(self::$_RESADMIN_COMMAND_HELP[$args[0]]))
+		if(!isset(self::$_RESADMIN_COMMAND_HELP[$args[0]]) && !isset(self::$_RES_COMMAND_HELP[$args[0]]))
 		{
 			$sender->sendMessage(Utils::getRedString('未知指令,请使用 /resadmin help 查看帮助'));
 		}
-		else if(!isset($args[self::$_RESADMIN_COMMAND_HELP[$args[0]][0]]))
+		else if(isset(self::$_RESADMIN_COMMAND_HELP[$args[0]]) && !isset($args[self::$_RESADMIN_COMMAND_HELP[$args[0]][0]]))
 		{
 			$sender->sendMessage(Utils::getAquaString('使用方法: '.self::$_RESADMIN_COMMAND_HELP[$args[0]][1]));
+		}
+		else if(isset(self::$_RES_COMMAND_HELP[$args[0]]) && !isset($args[self::$_RES_COMMAND_HELP[$args[0]][0]]))
+		{
+			$sender->sendMessage(Utils::getAquaString('使用方法: '.self::$_RES_COMMAND_HELP[$args[0]][1]));
 		}
 		else
 		{
@@ -923,7 +858,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				break;
 			
 			case 'reload':
-				$this->loadConfig();
+				$this->reload();
 				$sender->sendMessage(Utils::getGreenString('重载完成'));
 				break;
 			case 'parse':
@@ -946,6 +881,13 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			
 			case 'help':
 				$sender->sendMessage(Utils::makeList('FResidence Admin Help',self::$_RESADMIN_COMMAND_HELP,$args[1],($sender instanceof Player || $sender instanceof PlayerInfo)?5:50));
+				break;
+			
+			default:
+				if(isset(self::$_RES_COMMAND_HELP[$args[0]]))
+				{
+					$this->onResidenceCommand($sender,$args,true);
+				}
 				break;
 			}
 		}
@@ -972,12 +914,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			}
 			else
 			{
-				if($event->getItem()->getId()==$this->selectItem)
+				if($event->getItem()->getId()==ConfigProvider::SelectItem())
 				{
 					$player->setPos1($event->getBlock())->sendYellowMessage('已设置第一个点')->validateSelect(true);
 					$event->setCancelled();
 				}
-				else if(in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),$this->whiteListWorld) && !$player->isOp())
+				else if(!$player->isOp() && in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),ConfigProvider::WhiteListWorld()))
 				{
 					$player->sendYellowMessage('抱歉,当前世界需要先圈地才能进行建筑');
 					$event->setCancelled();
@@ -1007,7 +949,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			unset($event);
 			return;
 		}
-		$player->checkMoveTick=$this->checkMoveTick;
+		$player->checkMoveTick=ConfigProvider::CheckMoveTick();
 		if(($res=$this->provider->getResidenceByPosition($event->getTo()))!==null)
 		{
 			if(!$res->isOwner($player) && !$player->isOp() && !$res->hasPermission($player,Permissions::PERMISSION_MOVE))
@@ -1060,7 +1002,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		}
 		else
 		{
-			if(in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),$this->whiteListWorld) && !$player->isOp())
+			if(!$player->isOp() && in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),ConfigProvider::WhiteListWorld()))
 			{
 				$player->sendYellowMessage('抱歉,当前世界需要先圈地才能进行建筑');
 				$event->setCancelled();
@@ -1087,12 +1029,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		}
 		else
 		{
-			if($event->getItem()->getId()==$this->selectItem)
+			if($event->getItem()->getId()==ConfigProvider::SelectItem())
 			{
 				$player->setPos2($event->getBlock())->sendGreenMessage('已设置第二个点')->validateSelect(true);
 				$event->setCancelled();
 			}
-			else if(in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),$this->whiteListWorld) && !$player->isOp())
+			else if(!$player->isOp() && in_array(strtolower($event->getBlock()->getLevel()->getFolderName()),ConfigProvider::WhiteListWorld()))
 			{
 				$player->sendYellowMessage('抱歉,当前世界需要先圈地才能进行建筑');
 				$event->setCancelled();

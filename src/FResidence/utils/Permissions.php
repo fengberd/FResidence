@@ -1,7 +1,7 @@
 <?php
 namespace FResidence\utils;
 
-use FResidence\exception\InvalidArgumentException;
+use FResidence\exception\IllegalArgumentException;
 
 class Permissions
 {
@@ -76,7 +76,7 @@ class Permissions
 	{
 		if(!self::validateIndex($index=strtolower($index)))
 		{
-			throw new InvalidArgumentException('无效权限索引,请使用 Permissions::PERMISSION_XXX 常量');
+			throw new IllegalArgumentException('无效权限索引,请使用 Permissions::PERMISSION_XXX 常量');
 		}
 		return $index;
 	}
@@ -115,7 +115,7 @@ class Permissions
 	{
 		if(!self::validatePlayerIndex($index=strtolower($index)))
 		{
-			throw new InvalidArgumentException('无效权限索引,请使用 Permissions::PERMISSION_XXX 常量');
+			throw new IllegalArgumentException('无效权限索引,请使用 Permissions::PERMISSION_XXX 常量');
 		}
 		return $index;
 	}

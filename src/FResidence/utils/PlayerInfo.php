@@ -3,6 +3,8 @@ namespace FResidence\utils;
 
 use pocketmine\utils\TextFormat;
 
+use FResidence\provider\ConfigProvider;
+
 class PlayerInfo implements \pocketmine\IPlayer
 {
 	public $checkMoveTick=10;
@@ -100,7 +102,7 @@ class PlayerInfo implements \pocketmine\IPlayer
 			{
 				if($valid>=2*2*2)
 				{
-					$this->sendYellowMessage('选区已设定,需要 '.(Economy::$MoneyPerBlock*$valid).' '.Economy::$MoneyName.'来创建领地');
+					$this->sendYellowMessage('选区已设定,需要 '.(ConfigProvider::MoneyPerBlock()*$valid).' '.ConfigProvider::MoneyName().'来创建领地');
 				}
 				else
 				{

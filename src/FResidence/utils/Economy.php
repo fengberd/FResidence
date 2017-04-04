@@ -8,16 +8,11 @@ class Economy
 	const API_ECONOMY_API='EconomyAPI';
 	const API_ZXDA_COUPONS='ZXDACoupons';
 	
-	public static $MoneyName='';
-	public static $MoneyPerBlock=0;
-	
 	private static $API='';
 	
-	public static function init($preferAPI='',$moneyName,$moneyPerBlock)
+	public static function init($preferAPI='')
 	{
 		$available=array();
-		self::$MoneyName=$moneyName;
-		self::$MoneyPerBlock=$moneyPerBlock;
 		if(class_exists('\\onebone\\economyapi\\EconomyAPI',false))
 		{
 			$available[]=self::API_ECONOMY_API;
@@ -32,6 +27,11 @@ class Economy
 		}
 		self::$API=$preferAPI;
 		unset($available,$preferAPI);
+	}
+	
+	public static function getApiName()
+	{
+		return self::$API;
 	}
 	
 	public static function getMoney($player)
