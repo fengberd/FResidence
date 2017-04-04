@@ -74,7 +74,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		'help'=>array(0,'/res help [页码]','查看使用帮助'),
 		'confirm'=>array(1,'/res confirm <验证码>','确认执行危险操作'),
 		
-		'pset'=>array(4,'/res pset <领地> <玩家> <权限> <true/false>','设置某玩家的领地权限'),
+		'pset'=>array(4,'/res pset <领地> <玩家> <权限> <true/false/remove>','设置/删除某玩家的领地权限'),
 		'set'=>array(3,'/res set <领地> <权限> <true/false>','设置领地默认权限'),
 		
 		'default'=>array(1,'/res default <领地>','重置领地的所有权限'),
@@ -606,8 +606,16 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					$sender->sendRedMessage('你没有权限修改这块领地的权限');
 					break;
 				}
-				$res->getPermissions()->setPlayerPermission($args[2],$args[3],$args[4]=Utils::parseBool($args[4]));
-				$sender->sendGreenMessage('成功设置玩家 '.$args[2].' 在领地 '.$res->getName().' 的权限 '.$args[3].' 为 '.($args[4]?'开启':'关闭'));
+				if(strtolower($args[4])=='remove')
+				{
+					$res->getPermissions()->removePlayerPermission($args[2],$args[3]);
+					$sender->sendGreenMessage('成功移除玩家 '.$args[2].' 在领地 '.$res->getName().' 的权限 '.$args[3]);
+				}
+				else
+				{
+					$res->getPermissions()->setPlayerPermission($args[2],$args[3],$args[4]=Utils::parseBool($args[4]));
+					$sender->sendGreenMessage('成功设置玩家 '.$args[2].' 在领地 '.$res->getName().' 的权限 '.$args[3].' 为 '.($args[4]?'开启':'关闭'));
+				}
 				break;
 			case 'set':
 				if(!Permissions::validateIndex($args[2]=strtolower($args[2])))

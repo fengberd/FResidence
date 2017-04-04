@@ -91,15 +91,7 @@ class Permissions
 			}
 			else
 			{
-				$data[$key]=parseBool($data[$key]);
-			}
-			unset($key,$val);
-		}
-		foreach(self::$playerDefaults as $key=>$val)
-		{
-			if(!isset($data[$key]))
-			{
-				$data[$key]=$val;
+				$data[$key]=Utils::parseBool($data[$key]);
 			}
 			unset($key,$val);
 		}
@@ -206,6 +198,20 @@ class Permissions
 		$player=Utils::getPlayerName($player);
 		$index=self::validatePlayerIndexThrow($index);
 		$this->playerPermissions[$player][$index]=Utils::parseBool($val);
+		$this->trySave();
+		unset($player,$index,$val);
+		return $this;
+	}
+	
+	public function removePlayerPermission($player,string $index)
+	{
+		$player=Utils::getPlayerName($player);
+		$index=self::validatePlayerIndexThrow($index);
+		unset($this->playerPermissions[$player][$index]);
+		if(count($this->playerPermissions[$player])==0)
+		{
+			unset($this->playerPermissions[$player]);
+		}
 		$this->trySave();
 		unset($player,$index,$val);
 		return $this;
