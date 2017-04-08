@@ -27,6 +27,7 @@ use FResidence\provider\ConfigProvider;
 
 use FResidence\event\ResidenceAddEvent;
 use FResidence\event\ResidenceRemoveEvent;
+use FResidence\event\ResidenceOwnerChangeEvent;
 
 use FResidence\exception\FResidenceException;
 
@@ -34,28 +35,28 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 {
 	private static $obj=null;
 	public static $protectedBlocks=array(
-		Block::TNT,
-		Block::SAPLING,
-		Block::BED_BLOCK,
-		Block::CAKE_BLOCK,
-		Block::SUGARCANE_BLOCK,
+		46, // Block::TNT,
+		6, // Block::SAPLING,
+		26, // Block::BED_BLOCK,
+		92, // Block::CAKE_BLOCK,
+		83, // Block::SUGARCANE_BLOCK,
 		
-		Block::ANVIL,
-		Block::FURNACE,
-		Block::DROPPER,
-		Block::DISPENSER,
-		Block::ENDER_CHEST,
-		Block::HOPPER_BLOCK,
-		Block::CAULDRON_BLOCK,
-		Block::BURNING_FURNACE,
-		Block::ENCHANTING_TABLE,
-		Block::ITEM_FRAME_BLOCK,
-		Block::FLOWER_POT_BLOCK,
+		145, // Block::ANVIL,
+		61, // Block::FURNACE,
+		125, // Block::DROPPER,
+		23, // Block::DISPENSER,
+		130, // Block::ENDER_CHEST,
+		154, // Block::HOPPER_BLOCK,
+		118, // Block::CAULDRON_BLOCK,
+		62, // Block::BURNING_FURNACE,
+		116, // Block::ENCHANTING_TABLE,
+		199, // Block::ITEM_FRAME_BLOCK,
+		140, // Block::FLOWER_POT_BLOCK,
 		
-		Block::LEVER,
-		Block::NOTE_BLOCK,
-		Block::DAYLIGHT_SENSOR,
-		Block::DAYLIGHT_SENSOR_INVERTED);
+		69, // Block::LEVER,
+		25, // Block::NOTE_BLOCK,
+		178 // Block::DAYLIGHT_SENSOR
+		);
 	
 	private static $_RES_COMMAND_HELP=array(
 		'select'=>array(1,'/res select <size|chunk|vert|X Y Z>','查看选区大小/选取整个区块/扩展选区Y坐标到0-128/选择以当前坐标为起点 ,半径为指定大小的选区'),
@@ -118,6 +119,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	
 	public function reload()
 	{
+		Utils::init($this);
 		ConfigProvider::init($this);
 		Permissions::init();
 		Economy::init(ConfigProvider::PreferEconomy());
@@ -469,7 +471,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					$sender->sendRedMessage('选区无效,请确保你选择的两个点在同一个世界内并且选区大于2x2x2');
 					break;
 				}
-				$money*=$granted?0:Economy::$MoneyPerBlock;
+				$money*=$granted?0:ConfigProvider::MoneyPerBlock();
 				if($money>Economy::getMoney($sender))
 				{
 					$sender->sendRedMessage('你没有足够的钱来圈地 ,需要 '.$money.' '.ConfigProvider::MoneyName());
@@ -493,8 +495,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					unset($pos1,$pos2,$conflict);
 					break;
 				}
-				$this->getServer()->getPluginManager()->callEvent($ev=new ResidenceAddEvent($this,$money,$sender->getPos1(),$sender->getPos2(),$args[1],$sender));
-				if(!$ev->isCancelled())
+				if(Utils::callEvent($ev=new ResidenceAddEvent($this,$money,$sender->getPos1(),$sender->getPos2(),$args[1],$sender)))
 				{
 					$this->provider->addResidence($ev->getPos1(),$ev->getPos2(),$sender,$ev->getResName());
 					Economy::reduceMoney($sender,$ev->getMoney());
@@ -514,8 +515,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					$sender->sendRedMessage('你没有权限移除这块领地');
 					break;
 				}
-				$this->getServer()->getPluginManager()->callEvent($ev=new ResidenceRemoveEvent($this,$res));
-				if(!$ev->isCancelled())
+				if(Utils::callEvent(new ResidenceRemoveEvent($this,$res)))
 				{
 					$this->provider->removeResidence($res);
 					$sender->sendGreenMessage('领地 '.$res->getName().' 移除成功');
@@ -676,8 +676,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					$sender->sendRedMessage('你没有权限赠送这块领地');
 					break;
 				}
-				$res->setOwner($args[2]);
-				$sender->sendGreenMessage('成功把领地 '.$res->getName().' 赠送给玩家 '.$args[2]);
+				if(Utils::callEvent($ev=new ResidenceOwnerChangeEvent($this,$res,$args[2])))
+				{
+					$res->setOwner($ev->getOwner());
+					$sender->sendGreenMessage('成功把领地 '.$res->getName().' 赠送给玩家 '.$ev->getOwner());
+				}
+				unset($ev);
 				break;
 			case 'message':
 				if(!Messages::validateIndex($args[2]=strtolower($args[2])))
@@ -852,8 +856,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					$sender->sendMessage(Utils::getGreenString('领地不存在'));
 					break;
 				}
-				$res->setOwner($args[2]);
-				$sender->sendMessage(Utils::getGreenString('成功把领地 '.$res->getName().' 的主人设置为 '.$args[2]));
+				if(Utils::callEvent($ev=new ResidenceOwnerChangeEvent($this,$res,$args[2])))
+				{
+					$res->setOwner($ev->getOwner());
+					$sender->sendMessage(Utils::getGreenString('成功把领地 '.$res->getName().' 的主人设置为 '.$ev->getOwner()));
+				}
+				unset($ev);
 				break;
 			case 'server':
 				if(($res=$this->provider->getResidenceByName($args[1]))===null)

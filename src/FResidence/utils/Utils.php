@@ -8,6 +8,25 @@ class Utils
 {
 	const CONFIG_VERSION=2;
 	
+	private static $main=null;
+	private static $pluginManager=null;
+	
+	public static function init(\FResidence\Main $main)
+	{
+		self::$main=$main;
+		self::$pluginManager=$main->getServer()->getPluginManager();
+	}
+	
+	public static function callEvent(\FResidence\event\FResidenceEvent $ev)
+	{
+		self::$pluginManager->callEvent($ev);
+		if($ev instanceof \FResidence\event\CancellableFResidenceEvent)
+		{
+			return !$ev->isCancelled();
+		}
+		return true;
+	}
+	
 	public static function calculateSize($p1,$p2)
 	{
 		return max(abs($p1->getX()-$p2->getX()),1)*max(abs($p1->getY()-$p2->getY()),1)*max(abs($p1->getZ()-$p2->getZ()),1);
