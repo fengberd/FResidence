@@ -92,6 +92,20 @@ class PlayerInfo implements \pocketmine\IPlayer
 		return $this;
 	}
 	
+	public function sendColorTip($msg,$color=TextFormat::WHITE)
+	{
+		if(!method_exists($this->player,'sendTip'))
+		{
+			return $this->sendColorMessage($msg,$color);
+		}
+		if($msg!='')
+		{
+			$this->sendTip($color.$msg);
+		}
+		unset($msg,$color);
+		return $this;
+	}
+	
 	public function validateSelect($notify=false)
 	{
 		$valid=-1;
@@ -130,7 +144,14 @@ class PlayerInfo implements \pocketmine\IPlayer
 		{
 			$pos->x=intval($pos->getX());
 			$pos->z=intval($pos->getZ());
-			$pos->y=min(max($pos->getY(),0),256);
+			if(ConfigProvider::SelectVert())
+			{
+				$pos->y=0;
+			}
+			else
+			{
+				$pos->y=min(max($pos->getY(),0),256);
+			}
 		}
 		$this->pos1=$pos;
 		unset($pos);
@@ -148,7 +169,14 @@ class PlayerInfo implements \pocketmine\IPlayer
 		{
 			$pos->x=intval($pos->getX());
 			$pos->z=intval($pos->getZ());
-			$pos->y=min(max($pos->getY(),0),256);
+			if(ConfigProvider::SelectVert())
+			{
+				$pos->y=256;
+			}
+			else
+			{
+				$pos->y=min(max($pos->getY(),0),256);
+			}
 		}
 		$this->pos2=$pos;
 		unset($pos);

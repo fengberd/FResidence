@@ -12,6 +12,7 @@ class ConfigProvider
 	private static $defaults=array(
 		'Provider'=>'Yaml',
 		'MoneyName'=>'元',
+		'SelectVert'=>false,
 		'SelectItem'=>\pocketmine\item\Item::STRING,
 		'PreferEconomy'=>'EconomyAPI',
 		'CheckMoveTick'=>10,

@@ -166,10 +166,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			$this->getLogger()->warning('当前正在使用试用版授权,试用时间到后将强制关闭服务器');
 		}
-		if(!defined('EOL'))
-		{
-			define('EOL',"\n");
-		}
 		if(!self::$obj instanceof Main)
 		{
 			self::$obj=$this;
@@ -206,10 +202,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function systemTaskCallback($currentTick)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		foreach($this->players as $player)
 		{
 			if($player->inResidence() && $player->getResidence()->getPermission(Permissions::PERMISSION_HEALING))
@@ -247,10 +239,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function onCommand(\pocketmine\command\CommandSender $sender,\pocketmine\command\Command $command,$label,array $args)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		if(!isset($args[0]))
 		{
 			$args[0]='help';
@@ -364,10 +352,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function onResidenceCommand($sender,array $args,$granted=false)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		if(!isset(self::$_RES_COMMAND_HELP[$args[0]]))
 		{
 			$sender->sendMessage(Utils::getRedString('未知指令,请使用 /res help 查看帮助'));
@@ -414,6 +398,11 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 						->sendGreenMessage('已选中当前所在区块')->validateSelect(true);
 					break;
 				case 'vert':
+					if(ConfigProvider::SelectVert())
+					{
+						$sender->sendRedMessage('服务器已配置为自动选择整个Y轴,无需使用此指令');
+						break;
+					}
 					if(!$sender->isSelectFinish())
 					{
 						$sender->sendRedMessage('请先选择两个点再执行此命令');
@@ -569,7 +558,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				$sender->sendMessage(Utils::makeList('FResidence Help',self::$_RES_COMMAND_HELP,$args[1],($sender instanceof Player || $sender instanceof PlayerInfo)?5:50));
 				break;
 			case 'confirm':
-				if(($confirm=$player->getConfirm('default',$args[1]))!==null)
+				if(($confirm=$sender->getConfirm('default',$args[1]))!==null)
 				{
 					switch($confirm[0])
 					{
@@ -579,7 +568,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					}
 				}
 				break;
-			
 			case 'pset':
 				if(!Utils::validatePlayerName($args[2]=Utils::getPlayerName($args[2])))
 				{
@@ -798,10 +786,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function onResidenceAdminCommand($sender,array $args)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		if(!isset(self::$_RESADMIN_COMMAND_HELP[$args[0]]) && !isset(self::$_RES_COMMAND_HELP[$args[0]]))
 		{
 			$sender->sendMessage(Utils::getRedString('未知指令,请使用 /resadmin help 查看帮助'));
@@ -913,10 +897,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function onPlayerInteract(PlayerInteractEvent $event)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		if($event->getAction()==PlayerInteractEvent::RIGHT_CLICK_BLOCK)
 		{
 			$player=$this->getPlayer($event);
@@ -924,7 +904,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			{
 				if(!$player->isOp() && !$res->isOwner($player) && ($this->isProtectBlock($event->getBlock()) || $this->isBlockedItem($event->getItem())) && !$res->hasPermission($player,Permissions::PERMISSION_USE))
 				{
-					$player->sendColorMessage($res->getMessage(Messages::INDEX_PERMISSION));
+					$player->sendColorTip($res->getMessage(Messages::INDEX_PERMISSION));
 					$event->setCancelled();
 				}
 			}
@@ -946,13 +926,24 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		unset($event);
 	}
 	
+	public function onItemFrameDropItem(\pocketmine\event\block\ItemFrameDropItemEvent $event)
+	{
+		ZXDA::isTrialVersion();
+		$player=$this->getPlayer($event->getPlayer());
+		if(($res=$this->provider->getResidenceByPosition($event->getBlock()))!==null)
+		{
+			if(!$player->isOp() && !$res->isOwner($player) && !$res->hasPermission($player,Permissions::PERMISSION_USE))
+			{
+				$player->sendColorTip($res->getMessage(Messages::INDEX_PERMISSION));
+				$event->setCancelled();
+			}
+		}
+		unset($player,$res,$event);
+	}
+	
 	public function onPlayerMove(\pocketmine\event\player\PlayerMoveEvent $event)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		$player=$this->getPlayer($event);
 		$player->checkMoveTick--;
 		$player->movementLog[]=$event->getFrom();
@@ -971,10 +962,8 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			if(!$res->isOwner($player) && !$player->isOp() && !$res->hasPermission($player,Permissions::PERMISSION_MOVE))
 			{
 				$player->teleport($player->movementLog[0]);
-				if(($msg=$res->getMessage(Messages::INDEX_PERMISSION))!='')
-				{
-					$player->sendTip($msg);
-				}
+				$player->movementLog=array($player->movementLog[0]);
+				$player->sendColorTip($res->getMessage(Messages::INDEX_PERMISSION));
 				unset($msg);
 			}
 			else if(!$player->inResidence() || $player->getResidence()->getId()!=$res->getId())
@@ -1002,16 +991,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function onBlockPlace(\pocketmine\event\block\BlockPlaceEvent $event)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		$player=$this->getPlayer($event->getPlayer());
 		if(($res=$this->provider->getResidenceByPosition($event->getBlock()))!==null)
 		{
 			if(!$res->isOwner($player) && !$res->hasPermission($player,Permissions::PERMISSION_BUILD) && !$player->isOp())
 			{
-				$player->sendColorMessage($res->getMessage(Messages::INDEX_PERMISSION));
+				$player->sendColorTip($res->getMessage(Messages::INDEX_PERMISSION));
 				$event->setCancelled();
 			}
 			unset($player);
@@ -1030,16 +1015,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function onBlockBreak(\pocketmine\event\block\BlockBreakEvent $event)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		$player=$this->getPlayer($event->getPlayer());
 		if(($res=$this->provider->getResidenceByPosition($event->getBlock()))!==null)
 		{
 			if(!$res->isOwner($player) && !$res->hasPermission($player,Permissions::PERMISSION_BUILD) && !$player->isOp())
 			{
-				$player->sendColorMessage($res->getMessage(Messages::INDEX_PERMISSION));
+				$player->sendColorTip($res->getMessage(Messages::INDEX_PERMISSION));
 				$event->setCancelled();
 			}
 		}
@@ -1062,10 +1043,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function onBlockUpdate(\pocketmine\event\block\BlockUpdateEvent $event)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		$block=$event->getBlock();
 		if($block->getId()>=8 && $block->getId()<=11 && ($res=$this->provider->getResidenceByPosition($block))!==null && !$res->getPermission(Permissions::PERMISSION_FLOW))
 		{
@@ -1077,10 +1054,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function onLevelLoad(\pocketmine\event\level\LevelLoadEvent $event)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		$this->provider->reload();
 		unset($event);
 	}
@@ -1088,10 +1061,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function onEntityDamage(\pocketmine\event\entity\EntityDamageEvent $event)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		if(($res=$this->provider->getResidenceByPosition($event->getEntity()))!==null && !$res->getPermission(Permissions::PERMISSION_DAMAGE))
 		{
 			$event->setCancelled();
@@ -1115,10 +1084,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function onPlayerJoin(\pocketmine\event\player\PlayerJoinEvent $event)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		$this->players[$event->getPlayer()->getId()]=new PlayerInfo($event->getPlayer());
 		unset($event);
 	}
@@ -1126,20 +1091,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function onPlayerQuit(\pocketmine\event\player\PlayerQuitEvent $event)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		unset($this->players[$event->getPlayer()->getId()],$event);
 	}
 	
 	public function isProtectBlock(Block $block)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		if($block instanceof Blocks\Door || 
 			$block instanceof Blocks\Chest || 
 			$block instanceof Blocks\Trapdoor || 
@@ -1157,10 +1114,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 	public function isBlockedItem(Item $item)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		switch($item->getId())
 		{
 		case Item::FLINT_STEEL:
@@ -1182,14 +1135,10 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		return false;
 	}
 	
-	//领地判断算法移植自PC的Residence，若侵犯原作者权益请联系我,Gmail:FENGberd@gmail.com
+	// 移植自PC的Residence
 	public function check($pos1,$pos2,$pos3,$pos4)
 	{
 		ZXDA::isTrialVersion();
-		if(!ZXDA::isVerified())
-		{
-			return null;
-		}
 		if($pos1 instanceof Vector3)
 		{
 			$x1=$pos1->getX();
@@ -1263,119 +1212,35 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 
 class ZXDA
 {
-	private static $_PID=false;
-	private static $_TOKEN=false;
+	const API_VERSION=5013;
+	
 	private static $_PLUGIN=null;
-	private static $_VERIFIED=false;
-	private static $_API_VERSION=5012;
 	
 	public static function init($pid,$plugin)
 	{
-		if(!is_numeric($pid))
+		if(!\is_numeric($pid))
 		{
-			self::killit('参数错误,请传入正确的PID(0001)');
+			self::unknownError(10003);
 			exit();
 		}
+		self::ks('PID',$pid);
 		self::$_PLUGIN=$plugin;
-		if(self::$_PID!==false && self::$_PID!=$pid)
-		{
-			self::killit('非法访问(0002)');
-			exit();
-		}
-		self::$_PID=$pid;
 	}
 	
-	public static function checkKernelVersion()
+	public static function killit($msg)
 	{
-		if(self::$_PID===false)
+		if(self::$_PLUGIN===\null)
 		{
-			self::killit('SDK尚未初始化(0003)');
-			exit();
+			echo('抱歉,插件授权验证失败[SDK:'.self::API_VERSION."]:\n".$msg);
 		}
-		if(!class_exists('\\ZXDAKernel\\Main'))
+		else
 		{
-			self::killit('请到 https://pl.zxda.net/ 下载安装最新版ZXDA Kernel后再使用此插件(0004)');
-			exit();
+			@self::$_PLUGIN->getLogger()->warning('§e抱歉,插件授权验证失败[SDK:'.self::API_VERSION.']:');
+			@self::$_PLUGIN->getLogger()->warning('§e'.$msg);
+			@self::$_PLUGIN->getServer()->forceShutdown();
 		}
-		$version=\ZXDAKernel\Main::getVersion();
-		if($version<self::$_API_VERSION)
-		{
-			self::killit('当前ZXDA Kernel版本太旧,无法使用此插件,请到 https://pl.zxda.net/ 下载安装最新版后再使用此插件(0005)');
-			exit();
-		}
-		return $version;
-	}
-	
-	public static function isTrialVersion()
-	{
-		try
-		{
-			self::checkKernelVersion();
-			return \ZXDAKernel\Main::isTrialVersion(self::$_PID);
-		}
-		catch(\Exception $err)
-		{
-			@file_put_contents(self::$_PLUGIN->getServer()->getDataPath().'0007_data.dump',var_export($err,true));
-			self::killit('未知错误(0007),错误数据已保存到 0007_data.dump 中,请提交到群内获取帮助');
-		}
-	}
-	
-	public static function requestCheck()
-	{
-		try
-		{
-			self::checkKernelVersion();
-			self::$_VERIFIED=false;
-			self::$_TOKEN=sha1(uniqid());
-			if(!\ZXDAKernel\Main::requestAuthorization(self::$_PID,self::$_PLUGIN,self::$_TOKEN))
-			{
-				self::killit('请求授权失败,请检查PID是否已正确传入(0006)');
-				exit();
-			}
-		}
-		catch(\Exception $err)
-		{
-			@file_put_contents(self::$_PLUGIN->getServer()->getDataPath().'0007_data.dump',var_export($err,true));
-			self::killit('未知错误(0007),错误数据已保存到 0007_data.dump 中,请提交到群内获取帮助');
-		}
-	}
-	
-	public static function tokenCheck($key)
-	{
-		try
-		{
-			self::checkKernelVersion();
-			self::$_VERIFIED=false;
-			$manager=self::$_PLUGIN->getServer()->getPluginManager();
-			if(!($plugin=$manager->getPlugin('ZXDAKernel')) instanceof \ZXDAKernel\Main)
-			{
-				self::killit('ZXDA Kernel加载失败,请检查插件是否已正常安装(0008)');
-			}
-			if(!$manager->isPluginEnabled($plugin))
-			{
-				$manager->enablePlugin($plugin);
-			}
-			$key=base64_decode($key);
-			if(($token=\ZXDAKernel\Main::getResultToken(self::$_PID))===false)
-			{
-				self::killit('请勿进行非法破解(0009)');
-			}
-			if(self::rsa_decode(base64_decode($token),$key,768)!=sha1(strrev(self::$_TOKEN)))
-			{
-				self::killit('插件Key错误,请更新插件或联系作者(0010)');
-			}
-			self::$_VERIFIED=true;
-		}
-		catch(\Exception $err)
-		{
-			@file_put_contents(self::$_PLUGIN->getServer()->getDataPath().'0007_data.dump',var_export($err,true));
-			self::killit('未知错误(0007),错误数据已保存到 0007_data.dump 中,请提交到群内获取帮助');
-		}
-	}
-	
-	public static function isVerified()
-	{
-		return self::$_VERIFIED;
+		@\pocketmine\kill(\getmypid());
+		exit();
 	}
 	
 	public static function getInfo()
@@ -1386,51 +1251,296 @@ class ZXDA
 			$manager=self::$_PLUGIN->getServer()->getPluginManager();
 			if(!($plugin=$manager->getPlugin('ZXDAKernel')) instanceof \ZXDAKernel\Main)
 			{
-				self::killit('ZXDA Kernel加载失败,请检查插件是否已正常安装(0008)');
+				self::unknownError(10010);
+				exit();
 			}
-			if(($data=\ZXDAKernel\Main::getPluginInfo(self::$_PID))===false)
+			if(($data=\ZXDAKernel\Main::getPluginInfo(self::ks('PID')))===\false)
 			{
-				self::killit('请勿进行非法破解(0009)');
+				self::unknownError(10011);
+				exit();
 			}
-			if(count($data=explode(',',$data))!=2)
+			if(\count($data=\explode(',',$data))!=2)
 			{
 				return array(
-					'success'=>false,
+					'success'=>\false,
 					'message'=>'未知错误');
 			}
 			return array(
-				'success'=>true,
-				'version'=>base64_decode($data[0]),
-				'update_info'=>base64_decode($data[1]));
+				'success'=>\true,
+				'version'=>\base64_decode($data[0]),
+				'update_info'=>\base64_decode($data[1]));
 		}
 		catch(\Exception $err)
 		{
-			@file_put_contents(self::$_PLUGIN->getServer()->getDataPath().'0007_data.dump',var_export($err,true));
-			self::killit('未知错误(0007),错误数据已保存到 0007_data.dump 中,请提交到群内获取帮助');
+			@\file_put_contents(self::$_PLUGIN->getServer()->getDataPath().'error.dump',\var_export($err,\true));
+			self::unknownError(10012);
+			exit();
 		}
 	}
 	
-	public static function killit($msg)
+	public static function tokenCheck($key)
 	{
-		if(self::$_PLUGIN===null)
+		try
 		{
-			echo('抱歉,插件授权验证失败[SDK:'.self::$_API_VERSION."]\n附加信息:".$msg);
+			self::checkKernelVersion();
+			$manager=self::$_PLUGIN->getServer()->getPluginManager();
+			if(!($plugin=$manager->getPlugin('ZXDAKernel')) instanceof \ZXDAKernel\Main)
+			{
+				self::unknownError(10013);
+			}
+			if(!$manager->isPluginEnabled($plugin))
+			{
+				$manager->enablePlugin($plugin);
+			}
+			$key=\base64_decode($key);
+			if(($token=\ZXDAKernel\Main::getResultToken(self::ks('PID')))===\false)
+			{
+				self::unknownError(10014);
+			}
+			$token=self::rsa_decode(\base64_decode($token),$key,768);
+			if(self::kv('TOKEN',$token)!==\true)
+			{
+				self::unknownError(10015);
+			}
+		}
+		catch(\Exception $err)
+		{
+			@\file_put_contents(self::$_PLUGIN->getServer()->getDataPath().'error.dump',\var_export($err,\true));
+			self::unknownError(10009);
+			exit();
+		}
+	}
+	
+	public static function requestCheck()
+	{
+		try
+		{
+			self::checkKernelVersion();
+			if(self::kv('TOKEN')!==\null)
+			{
+				self::unknownError(10006);
+				exit();
+			}
+			self::kv('TOKEN',\sha1(\strrev($t=\sha1(\uniqid().\var_export($_SERVER,\true)))));
+			if(!@\ZXDAKernel\Main::requestAuthorization(self::ks('PID'),self::$_PLUGIN,\substr($t.'Moe',0,-3)))
+			{
+				self::unknownError(10007);
+				exit();
+			}
+		}
+		catch(\Exception $err)
+		{
+			@\file_put_contents(self::$_PLUGIN->getServer()->getDataPath().'error.dump',\var_export($err,\true));
+			self::unknownError(10008);
+			exit();
+		}
+	}
+	
+	public static function isTrialVersion()
+	{
+		try
+		{
+			self::checkKernelVersion();
+			return \ZXDAKernel\Main::isTrialVersion(self::ks('PID'));
+		}
+		catch(\Exception $err)
+		{
+			@\file_put_contents(self::$_PLUGIN->getServer()->getDataPath().'error.dump',\var_export($err,\true));
+			self::unknownError(10016);
+			exit();
+		}
+	}
+	
+	public static function checkKernelVersion()
+	{
+		if(self::ks('PID')===\false)
+		{
+			self::unknownError(10004);
+			exit();
+		}
+		if(!\class_exists('\\ZXDAKernel\\Main'))
+		{
+			self::killit('请到 https://pl.zxda.net/ 下载并安装最新版ZXDA Kernel后再使用此插件');
+			exit();
+		}
+		$version=@\ZXDAKernel\Main::getVersion();
+		if($version<self::API_VERSION)
+		{
+			self::killit('当前ZXDA Kernel版本太旧,请到 https://pl.zxda.net/ 下载并安装最新版ZXDA Kernel后再使用此插件');
+			exit();
+		}
+		return $version;
+	}
+	
+	private static function ks($key,$val=null)
+	{
+		static $storage=array();
+		if(\is_numeric($key))
+		{
+			self::unknownError(10001);
+			exit();
+		}
+		if(isset($storage[$key]))
+		{
+			if($val!==\null)
+			{
+				self::unknownError(10002);
+				exit();
+			}
+		}
+		else if($val===\null)
+		{
+			return \null;
 		}
 		else
 		{
-			@self::$_PLUGIN->getLogger()->warning('§e抱歉,插件授权验证失败[SDK:'.self::$_API_VERSION.']');
-			@self::$_PLUGIN->getLogger()->warning('§e附加信息:'.$msg);
-			@self::$_PLUGIN->getServer()->forceShutdown();
+			$storage[$key]=$val;
 		}
-		exit();
+		return $storage[$key];
 	}
 	
-	//RSA加密算法实现
-	public static function rsa_encode($message,$modulus,$keylength=1024,$isPriv=true){$result=array();while(strlen($msg=substr($message,0,$keylength/8-5))>0){$message=substr($message,strlen($msg));$result[]=self::number_to_binary(self::pow_mod(self::binary_to_number(self::add_PKCS1_padding($msg,$isPriv,$keylength/8)),'65537',$modulus),$keylength/8);unset($msg);}return implode('***&&&***',$result);}
-	public static function rsa_decode($message,$modulus,$keylength=1024){$result=array();foreach(explode('***&&&***',$message) as $message){$result[]=self::remove_PKCS1_padding(self::number_to_binary(self::pow_mod(self::binary_to_number($message),'65537',$modulus),$keylength/8),$keylength/8);unset($message);}return implode('',$result);}
-	private static function pow_mod($p,$q,$r){$factors=array();$div=$q;$power_of_two=0;while(bccomp($div,'0')==1){$rem=bcmod($div,2);$div=bcdiv($div,2);if($rem){array_push($factors,$power_of_two);}$power_of_two++;}$partial_results=array();$part_res=$p;$idx=0;foreach($factors as $factor){while($idx<$factor){$part_res=bcpow($part_res,'2');$part_res=bcmod($part_res,$r);$idx++;}array_push($partial_results,$part_res);}$result='1';foreach($partial_results as $part_res){$result=bcmul($result,$part_res);$result=bcmod($result,$r);}return $result;}
-	private static function add_PKCS1_padding($data,$isprivateKey,$blocksize){$pad_length=$blocksize-3-strlen($data);if($isprivateKey){$block_type="\x02";$padding='';for($i=0;$i<$pad_length;$i++){$rnd=mt_rand(1,255);$padding .= chr($rnd);}}else{$block_type="\x01";$padding=str_repeat("\xFF",$pad_length);}return "\x00".$block_type.$padding."\x00".$data;}
-	private static function remove_PKCS1_padding($data,$blocksize){assert(strlen($data)==$blocksize);$data=substr($data,1);if($data{0}=='\0'){return '';}assert(($data{0}=="\x01") || ($data{0}=="\x02"));$offset=strpos($data,"\0",1);return substr($data,$offset+1);}
-	private static function binary_to_number($data){$radix='1';$result='0';for($i=strlen($data)-1;$i>=0;$i--){$digit=ord($data{$i});$part_res=bcmul($digit,$radix);$result=bcadd($result,$part_res);$radix=bcmul($radix,'256');}return $result;}
-	private static function number_to_binary($number,$blocksize){$result='';$div=$number;while($div>0){$mod=bcmod($div,'256');$div=bcdiv($div,'256');$result=chr($mod).$result;}return str_pad($result,$blocksize,"\x00",STR_PAD_LEFT);}
+	private static function kv($key,$val=null)
+	{
+		static $storage=array();
+		if(\is_numeric($key))
+		{
+			self::unknownError(10005);
+			exit();
+		}
+		if(isset($storage[$key]))
+		{
+			return $storage[$key]===$val;
+		}
+		else if($val===\null)
+		{
+			return \null;
+		}
+		else
+		{
+			$storage[$key]=$val;
+		}
+		return \false;
+	}
+	
+	private static function unknownError($code)
+	{
+		self::killit('未知错误[S-'.$code.'],请访问 https://pl.zxda.net/docs/autherr 获取帮助');
+	}
+	
+	//////////////////////////
+	
+	public static function rsa_encode($message,$modulus,$keylength=1024,$isPriv=\true)
+    {
+        $result=array();
+        while(\strlen($msg=\substr($message,0,$keylength/8-5))>0)
+        {
+            $message=\substr($message,\strlen($msg));
+            $result[]=self::number_to_binary(self::pow_mod(self::binary_to_number(self::add_PKCS1_padding($msg,$isPriv,$keylength/8)),'65537',$modulus),$keylength/8);
+            unset($msg);
+        }
+        return \implode('***&&&***',$result);
+    }
+	
+    public static function rsa_decode($message,$modulus,$keylength=1024)
+    {
+        $result=array();
+        foreach(\explode('***&&&***',$message) as $message)
+        {
+            $result[]=self::remove_PKCS1_padding(self::number_to_binary(self::pow_mod(self::binary_to_number($message),'65537',$modulus),$keylength/8),$keylength/8);
+            unset($message);
+        }
+        return \implode('',$result);
+    }
+	
+    private static function pow_mod($p,$q,$r)
+    {
+        $factors=array();
+        $div=$q;
+        $power_of_two=0;
+        while(\bccomp($div,'0')==1)
+        {
+            $rem=\bcmod($div,2);
+            $div=\bcdiv($div,2);
+            if($rem)
+            {
+                \array_push($factors,$power_of_two);
+            }
+            $power_of_two++;
+        }
+        $partial_results=array();
+        $part_res=$p;
+        $idx=0;
+        foreach($factors as $factor)
+        {
+            while($idx<$factor)
+            {
+                $part_res=\bcpow($part_res,'2');
+                $part_res=\bcmod($part_res,$r);
+                $idx++;
+            }
+            \array_push($partial_results,$part_res);
+        }
+        $result='1';
+        foreach($partial_results as $part_res)
+        {
+            $result=\bcmul($result,$part_res);
+            $result=\bcmod($result,$r);
+        }
+        return $result;
+    }
+	
+    private static function add_PKCS1_padding($data,$isprivateKey,$blocksize)
+    {
+        $pad_length=$blocksize-3-\strlen($data);
+        if($isprivateKey)
+        {
+            $padding="\x00\x02";
+            for($i=0; $i<$pad_length; $i++)
+            {
+                $padding.=\chr(\mt_rand(1,255));
+            }
+        }
+        else
+        {
+            $padding="\x00\x01".\str_repeat("\xFF",$pad_length);
+        }
+        return $padding."\x00".$data;
+    }
+	
+    private static function remove_PKCS1_padding($data,$blocksize)
+    {
+        \assert(\strlen($data)==$blocksize);
+        $data=\substr($data,1);
+        if($data{0}=="\0")
+        {
+            return '';
+        }
+        \assert($data{0}=="\x01" || $data{0}=="\x02");
+        $offset=\strpos($data,"\0",1);
+        return \substr($data,$offset+1);
+    }
+	
+    private static function binary_to_number($data)
+    {
+        $radix='1';
+        $result='0';
+        for($i=\strlen($data)-1;$i>=0;$i--)
+        {
+            $result=\bcadd($result,\bcmul(\ord($data{$i}),$radix));
+            $radix=\bcmul($radix,'256');
+        }
+        return $result;
+    }
+	
+    private static function number_to_binary($number,$blocksize)
+    {
+        $result='';
+        $div=$number;
+        while($div>0)
+        {
+            $result=\chr(\bcmod($div,'256')).$result;
+            $div=\bcdiv($div,'256');
+        }
+        return \str_pad($result,$blocksize,"\x00",\STR_PAD_LEFT);
+    }
 }
