@@ -15,10 +15,10 @@ class ResidenceOwnerChangeEvent extends CancellableFResidenceEvent
 	
 	public function getOwner()
 	{
-		return $owner;
+		return $this->owner;
 	}
 	
-	public function setOwner()
+	public function setOwner($owner)
 	{
 		$this->owner=Utils::getPlayerName($owner);
 	}
