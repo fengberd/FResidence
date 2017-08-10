@@ -22,6 +22,8 @@ use FResidence\utils\Messages;
 use FResidence\utils\PlayerInfo;
 use FResidence\utils\Permissions;
 
+use FResidence\command as Commands;
+
 use FResidence\provider as Providers;
 use FResidence\provider\ConfigProvider;
 
@@ -93,6 +95,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		'listall'=>array(0,'/resadmin listall','列出服务器上的所有领地'),
 		
 		'removeall'=>array(1,'/resadmin removeall <玩家>','移除某玩家的所有领地'),
+		'removeworld'=>array(1,'/resadmin removeworld <世界>','移除某个世界中的所有领地'),
 		'setowner'=>array(2,'/resadmin setowner <领地> <玩家>','设置领地的主人'),
 		'server'=>array(1,'/resadmin server <领地>','把领地设置为服务器领地,然后只有管理员能操作'),
 		
@@ -129,6 +132,9 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			break;
 		case 'sqlite3':
 			break;*/
+		case 'json':
+			$this->provider=new Providers\JsonDataProvider($this);
+			break;
 		default:
 			$this->getLogger()->warning('Provider不受支持,已切换至Yaml模式');
 		case 'yaml':
@@ -174,6 +180,23 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			$this->reload();
 			$this->getServer()->getScheduler()->scheduleRepeatingTask($this->systemTask=new SystemTask($this),20);
+			
+			$reflection=new \ReflectionClass('\\pocketmine\\command\\Command');
+			$reflection=$reflection->getMethod('execute')->getParameters();
+			if($reflection[1]->hasType())
+			{
+				include_once(dirname(__FILE__).'/command/ResidenceCommand_ForShit.php');
+				include_once(dirname(__FILE__).'/command/ResidenceAdminCommand_ForShit.php');
+			}
+			else
+			{
+				include_once(dirname(__FILE__).'/command/ResidenceCommand.php');
+				include_once(dirname(__FILE__).'/command/ResidenceAdminCommand.php');
+			}
+			$map=$this->getServer()->getCommandMap();
+			$map->register('FResidence',new Commands\ResidenceCommand($this));
+			$map->register('FResidence',new Commands\ResidenceAdminCommand($this));
+			unset($map);
 			
 			$reflection=new \ReflectionClass(get_class($this));
 			foreach($reflection->getMethods() as $method)
@@ -234,119 +257,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			return isset($this->players[$mixed])?$this->players[$mixed]:null;
 		}
 		return null;
-	}
-	
-	public function onCommand(\pocketmine\command\CommandSender $sender,\pocketmine\command\Command $command,$label,array $args)
-	{
-		ZXDA::isTrialVersion();
-		if(!isset($args[0]))
-		{
-			$args[0]='help';
-		}
-		$args[0]=strtolower($args[0]);
-		try
-		{
-			if(strtolower($command->getName())=='residenceadmin')
-			{
-				if($sender->hasPermission('Residence.admin'))
-				{
-					$this->onResidenceAdminCommand($sender,$args);
-				}
-				else
-				{
-					$sender->sendMessage(Utils::getRedString('权限不足'));
-				}
-			}
-			else
-			{
-				$this->onResidenceCommand($sender,$args);
-			}
-		}
-		catch(FResidenceException $e)
-		{
-			$sender->sendMessage(Utils::getRedString('无法完成操作: '.$e->getMessage()));
-		}
-		/*
-		switch(isset($args[0])?$args[0]:'help')
-		{
-		case 'wl':
-		case 'whitelist':
-			if(!$sender->isOp())
-			{
-				$sender->sendRedMessage('你没有权限进行此操作');
-				break;
-			}
-			if(!isset($args[1]))
-			{
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res whitelist [add <世界名>|remove <世界名>|list|clear]');
-				break;
-			}
-			switch($args[1])
-			{
-			case 'add':
-				if(!isset($args[2]))
-				{
-					$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res whitelist add <世界名>');
-					break;
-				}
-				$args[2]=strtolower($args[2]);
-				if(in_array($args[2],$this->whiteListWorld))
-				{
-					$sender->sendRedMessage('该世界已在白名单列表中');
-					break;
-				}
-				$this->whiteListWorld[]=$args[2];
-				$sender->sendGreenMessage('白名单世界添加成功');
-				break;
-			case 'remove':
-				if(!isset($args[2]))
-				{
-					$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res whitelist remove <世界名>');
-					break;
-				}
-				$args[2]=strtolower($args[2]);
-				if(!in_array($args[2],$this->whiteListWorld))
-				{
-					$sender->sendRedMessage('该世界不在白名单列表中');
-					break;
-				}
-				$data=$this->whiteListWorld;
-				$this->whiteListWorld=array();
-				foreach($data as $d)
-				{
-					if($d!=$args[2])
-					{
-						$this->whiteListWorld[]=$d;
-					}
-					unset($d);
-				}
-				unset($data);
-				$sender->sendGreenMessage('白名单世界移除成功');
-				break;
-			case 'list':
-				$data=TextFormat::GREEN.'====='.TextFormat::YELLOW.'WhiteList Worlds'.TextFormat::GREEN.'=====';
-				foreach($this->whiteListWorld as $world)
-				{
-					$data.=EOL.' - '.$world;
-					unset($world);
-				}
-				$sender->sendMessage($data);
-				unset($data);
-				break;
-			case 'clear':
-				$this->whiteListWorld=array();
-				$sender->sendGreenMessage('白名单世界清空成功');
-				break;
-			default:
-				$sender->sendMessage('[FResidence] '.TextFormat::AQUA.'使用方法: /res whitelist [add <世界名>|remove <世界名>|list|clear]');
-				break;
-			}
-			$this->config->set('whiteListWorld',$this->whiteListWorld);
-			$this->config->save();
-			break;
-		}*/
-		unset($sender,$command,$label,$args);
-		return true;
 	}
 	
 	public function onResidenceCommand($sender,array $args,$granted=false)
@@ -616,6 +526,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 						Permissions::PERMISSION_TELEPORT.' - 传送到领地',
 						Permissions::PERMISSION_PVP.' - 玩家互相PVP',
 						Permissions::PERMISSION_FLOW.' - 液体流动',
+						Permissions::PERMISSION_FIRE.' - 火焰蔓延',
 						Permissions::PERMISSION_DAMAGE.' - 造成伤害',
 						Permissions::PERMISSION_HEALING.' - 自动回血')));
 					break;
@@ -829,6 +740,21 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			case 'removeall':
 				$sender->sendMessage(Utils::getGreenString('成功移除玩家 '.TextFormat::AQUA.$args[1].TextFormat::GREEN.' 的所有领地 (操作 '.$this->provider->removeResidencesByOwner($args[1]).' 块领地)'));
 				break;
+			case 'removeworld':
+				$counter=0;
+				$args[1]=strtolower($args[1]);
+				foreach($this->provider->getAllResidences() as $res)
+				{
+					if(strtolower($res->getLevelName())==$args[1])
+					{
+						$this->provider->removeResidence($res);
+						$counter++;
+					}
+					unset($res);
+				}
+				$sender->sendMessage(Utils::getGreenString('成功移除世界 '.TextFormat::AQUA.$args[1].TextFormat::GREEN.' 中的所有领地 (操作 '.$counter.' 块领地)'));
+				unset($counter);
+				break;
 			case 'setowner':
 				if(!Utils::validatePlayerName($args[2]=Utils::getPlayerName($args[2])))
 				{
@@ -907,6 +833,10 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					$player->sendColorTip($res->getMessage(Messages::INDEX_PERMISSION));
 					$event->setCancelled();
 				}
+				else if($event->getItem()->getId()==259 && !$res->getPermission(Permissions::PERMISSION_FIRE))
+				{
+					$event->setCancelled();
+				}
 			}
 			else
 			{
@@ -957,7 +887,8 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			return;
 		}
 		$player->checkMoveTick=ConfigProvider::CheckMoveTick();
-		if(($res=$this->provider->getResidenceByPosition($event->getTo()))!==null)
+		$pos=$event->getTo()->asPosition();
+		if(($res=$this->provider->getResidenceByPosition(new Position(round($pos->x-0.5),$pos->y,round($pos->z-0.5),$pos->level)))!==null)
 		{
 			if(!$res->isOwner($player) && !$player->isOp() && !$res->hasPermission($player,Permissions::PERMISSION_MOVE))
 			{
@@ -985,7 +916,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 				$player->setResidence(null);
 			}
 		}
-		unset($event,$res,$player);
+		unset($event,$res,$player,$pos);
 	}
 	
 	public function onBlockPlace(\pocketmine\event\block\BlockPlaceEvent $event)
@@ -1047,6 +978,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		if($block->getId()>=8 && $block->getId()<=11 && ($res=$this->provider->getResidenceByPosition($block))!==null && !$res->getPermission(Permissions::PERMISSION_FLOW))
 		{
 			$event->setCancelled();
+		}
+		if($block->getId()==51 && ($res=$this->provider->getResidenceByPosition($block))!==null && !$res->getPermission(Permissions::PERMISSION_FIRE))
+		{
+			$event->setCancelled();
+			$block->getLevel()->setBlock($block,new Blocks\Air());
+			$this->getLogger()->info('Stop Fire Spread:'.$block->__toString());
 		}
 		unset($event,$block,$res);
 	}

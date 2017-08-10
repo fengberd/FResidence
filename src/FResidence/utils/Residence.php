@@ -13,6 +13,14 @@ class Residence
 	private $pos2=null;
 	private $teleport=null;
 	
+	private $minX=0;
+	private $minY=0;
+	private $minZ=0;
+	
+	private $maxX=0;
+	private $maxY=0;
+	private $maxZ=0;
+	
 	private $name='';
 	private $owner='';
 	private $level='';
@@ -20,14 +28,14 @@ class Residence
 	private $message=null;
 	private $permission=null;
 	
-	public function __construct(\FResidence\provider\DataProvider $provider,int $id,...$data)
+	public function __construct(\FResidence\provider\IDataProvider $provider,int $id,...$data)
 	{
 		if(is_array($data[0]))
 		{
 			$data=$data[0];
 			if(!($level=\pocketmine\Server::getInstance()->getLevelByName($data['level'])) instanceof \pocketmine\level\Level)
 			{
-				throw new \FResidence\exception\ResidenceInstantiationException('领地所在世界不存在,已被删除');
+				throw new \FResidence\exception\ResidenceInstantiationException('未找到领地所在世界,如果世界确实不存在领地会被自动删除,否则可以忽略此提示');
 			}
 			$this->name=$data['name'];
 			$this->owner=Utils::getPlayerName($data['owner']);
@@ -55,6 +63,7 @@ class Residence
 		}
 		$this->id=$id;
 		$this->_provider=$provider;
+		$this->calculateBoundary();
 	}
 	
 	public function getRawData()
@@ -181,6 +190,17 @@ class Residence
 		return true;
 	}
 	
+	public function calculateBoundary()
+	{
+		$this->maxX=max($this->pos1->x,$this->pos2->x);
+		$this->maxY=max($this->pos1->y,$this->pos2->y);
+		$this->maxZ=max($this->pos1->z,$this->pos2->z);
+		$this->minX=min($this->pos1->x,$this->pos2->x);
+		$this->minY=min($this->pos1->y,$this->pos2->y);
+		$this->minZ=min($this->pos1->z,$this->pos2->z);
+		return $this;
+	}
+	
 	public function inResidence($pos)
 	{
 		if(strtolower($pos->getLevel()->getFolderName())!=$this->level)
@@ -191,14 +211,10 @@ class Residence
 		$x=$pos->getX();
 		$y=$pos->getY();
 		$z=$pos->getZ();
-		if((($x<=$this->pos1->x && $x>=$this->pos2->x) || ($x>=$this->pos1->x && $x<=$this->pos2->x)) && 
-			(($y<=$this->pos1->y && $y>=$this->pos2->y) || ($y>=$this->pos1->y && $y<=$this->pos2->y)) && 
-			(($z<=$this->pos1->z && $z>=$this->pos2->z) || ($z>=$this->pos1->z && $z<=$this->pos2->z)))
-		{
-			unset($x,$y,$z,$pos);
-			return true;
-		}
+		$result=$this->minX<=$x && $x<=$this->maxX && 
+			$this->minY<=$y && $y<=$this->maxY && 
+			$this->minZ<=$z && $z<=$this->maxZ;
 		unset($x,$y,$z,$pos);
-		return false;
+		return $result;
 	}
 }

@@ -12,6 +12,7 @@ class Permissions
 	
 	const PERMISSION_PVP='pvp';
 	const PERMISSION_FLOW='flow';
+	const PERMISSION_FIRE='fire';
 	const PERMISSION_DAMAGE='damage';
 	const PERMISSION_HEALING='healing';
 	
@@ -28,6 +29,7 @@ class Permissions
 		self::$defaults=array_merge(array(
 			self::PERMISSION_PVP=>true,
 			self::PERMISSION_FLOW=>true,
+			self::PERMISSION_FIRE=>false,
 			self::PERMISSION_DAMAGE=>true,
 			self::PERMISSION_HEALING=>false),self::$playerDefaults);
 	}
