@@ -41,7 +41,7 @@ class YamlDataProvider extends BaseDataProvider
 		{
 			$this->save();
 		}
-		unset($save,$this);
+		unset($save);
 	}
 	
 	public function reload($save=false)

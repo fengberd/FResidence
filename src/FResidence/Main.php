@@ -96,12 +96,12 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		
 		'removeall'=>array(1,'/resadmin removeall <玩家>','移除某玩家的所有领地'),
 		'removeworld'=>array(1,'/resadmin removeworld <世界>','移除某个世界中的所有领地'),
+		
 		'setowner'=>array(2,'/resadmin setowner <领地> <玩家>','设置领地的主人'),
 		'server'=>array(1,'/resadmin server <领地>','把领地设置为服务器领地,然后只有管理员能操作'),
 		
 		'reload'=>array(0,'/resadmin reload','重载插件数据'),
 		'parse'=>array(0,'/resadmin parse','转换EconomyLand的数据到插件里,只有后台能使用'),
-		
 		'help'=>array(0,'/resadmin help [页码]','查看使用帮助'));
 	
 	public static function getInstance()
@@ -179,7 +179,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		try
 		{
 			$this->reload();
-			$this->getServer()->getScheduler()->scheduleRepeatingTask($this->systemTask=new SystemTask($this),20);
+			$this->getScheduler()->scheduleRepeatingTask($this->systemTask=new SystemTask($this),20);
 			
 			$reflection=new \ReflectionClass('\\pocketmine\\command\\Command');
 			$reflection=$reflection->getMethod('execute')->getParameters();
@@ -399,7 +399,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					$this->provider->addResidence($ev->getPos1(),$ev->getPos2(),$sender,$ev->getResName());
 					Economy::reduceMoney($sender,$ev->getMoney());
 					$sender->setPos1(null)->setPos2(null);
-					$sender->sendGreenMessage('领地创建成功 ,花费 '.$money.' '.ConfigProvider::MoneyName());
+					$sender->sendGreenMessage('领地创建成功 ,花费 '.$ev->getMoney().' '.ConfigProvider::MoneyName());
 				}
 				unset($pos1,$pos2,$conflict,$ev);
 				break;
@@ -452,7 +452,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 					$sender->sendYellowMessage('没有查询到任何领地');
 					break;
 				}
-				$sender->sendMessage(Utils::makeList('领地列表',$res,$args[1],($sender instanceof Player || $sender instanceof PlayerInfo)?5:50,function($val)
+				$sender->sendMessage(Utils::makeList('领地列表',$res,$args[1],5,function($val)
 				{
 					return is_string($val)?$val:(TextFormat::DARK_GREEN.$val->getName().TextFormat::WHITE.' - 世界:'.$val->getLevelName().',大小:'.$val->getSize().' 方块');
 				}));
@@ -481,7 +481,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			case 'pset':
 				if(!Utils::validatePlayerName($args[2]=Utils::getPlayerName($args[2])))
 				{
-					$sender->sendRedMessage('无效的用户名');
+					$sender->sendRedMessage('无效的玩家名');
 					break;
 				}
 				if(!Permissions::validatePlayerIndex($args[3]=strtolower($args[3])))
@@ -562,7 +562,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			case 'give':
 				if(!Utils::validatePlayerName($args[2]=Utils::getPlayerName($args[2])))
 				{
-					$sender->sendRedMessage('无效的用户名');
+					$sender->sendRedMessage('无效的玩家名');
 					break;
 				}
 				if(($res=$this->provider->getResidenceByName($args[1]))===null)
@@ -758,7 +758,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			case 'setowner':
 				if(!Utils::validatePlayerName($args[2]=Utils::getPlayerName($args[2])))
 				{
-					$sender->sendMessage(Utils::getGreenString('无效的用户名'));
+					$sender->sendMessage(Utils::getGreenString('无效的玩家名'));
 					break;
 				}
 				if(($res=$this->provider->getResidenceByName($args[1]))===null)
@@ -856,6 +856,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		unset($event);
 	}
 	
+	/*
 	public function onItemFrameDropItem(\pocketmine\event\block\ItemFrameDropItemEvent $event)
 	{
 		ZXDA::isTrialVersion();
@@ -870,6 +871,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		}
 		unset($player,$res,$event);
 	}
+	*/
 	
 	public function onPlayerMove(\pocketmine\event\player\PlayerMoveEvent $event)
 	{
@@ -877,7 +879,7 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		$player=$this->getPlayer($event);
 		$player->checkMoveTick--;
 		$player->movementLog[]=$event->getFrom();
-		if(count($player->movementLog)>$player->checkMoveTick)
+		if(count($player->movementLog)>ConfigProvider::CheckMoveTick())
 		{
 			array_shift($player->movementLog);
 		}
@@ -887,8 +889,8 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 			return;
 		}
 		$player->checkMoveTick=ConfigProvider::CheckMoveTick();
-		$pos=$event->getTo()->asPosition();
-		if(($res=$this->provider->getResidenceByPosition(new Position(round($pos->x-0.5),$pos->y,round($pos->z-0.5),$pos->level)))!==null)
+		$pos=$event->getTo();
+		if(($res=$this->provider->getResidenceByPosition(new Position(round($pos->x-0.5),$pos->y,round($pos->z-0.5),$pos->getLevel())))!==null)
 		{
 			if(!$res->isOwner($player) && !$player->isOp() && !$res->hasPermission($player,Permissions::PERMISSION_MOVE))
 			{
@@ -983,7 +985,6 @@ class Main extends \pocketmine\plugin\PluginBase implements \pocketmine\event\Li
 		{
 			$event->setCancelled();
 			$block->getLevel()->setBlock($block,new Blocks\Air());
-			$this->getLogger()->info('Stop Fire Spread:'.$block->__toString());
 		}
 		unset($event,$block,$res);
 	}

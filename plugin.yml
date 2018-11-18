@@ -1,6 +1,6 @@
 name: FResidence
 main: FResidence\Main
-version: 1.1.8
+version: 1.2.1
 load: POSTWORLD
 author: FENGberd
 softdepend:

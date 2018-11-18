@@ -1,15 +1,10 @@
 <?php
 namespace FResidence;
 
-class SystemTask extends \pocketmine\scheduler\PluginTask
+class SystemTask extends \pocketmine\scheduler\Task
 {
-	public function __construct(Main $plugin)
-	{
-		parent::__construct($plugin);
-	}
-	
 	public function onRun($currentTick)
 	{
-		$this->getOwner()->systemTaskCallback($currentTick);
+		\FResidence\Main::getInstance()->systemTaskCallback($currentTick);
 	}
 }
